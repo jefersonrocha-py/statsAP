@@ -453,6 +453,7 @@ export default function SettingsPage() {
           pageSize={pageSize}
           onPageChange={setPage}
           itemLabel="APs pendentes"
+          emptyLabel="Nenhum AP pendente"
         />
       </section>
     </div>

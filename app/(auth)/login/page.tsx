@@ -138,7 +138,7 @@ export default function LoginPage() {
               disabled={busy}
               className="btn-shine h-11 w-full rounded-xl bg-slate-950 text-white shadow-soft transition hover:bg-slate-800 active:scale-[.995] disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
             >
-              {busy ? "Entrando..." : "LOGIN"}
+              {busy ? "Entrando..." : "Entrar"}
             </button>
 
             <div className="text-muted flex items-center justify-between gap-3 text-xs">

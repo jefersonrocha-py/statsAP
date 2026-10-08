@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useThemeStore } from "@store/theme";
+import { useUIStore } from "@store/ui";
 import NotificationBell from "@components/NotificationBell";
 import { buildApiHeaders } from "@services/api";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faBars,
   faRightFromBracket,
   faMagnifyingGlass,
   faRotateRight,
@@ -17,7 +19,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 /**
- * TopBar (sem hambúrguer)
+ * TopBar
+ * - Botão ☰ (só no celular) abre a gaveta do menu
  * - Busca (Enter -> "search-antennas")
  * - Recarregar / Fullscreen do mapa (#map-root)
  * - Toggle de tema via store
@@ -25,6 +28,7 @@ import {
  */
 export default function TopBar() {
   const router = useRouter();
+  const { mobileMenuOpen, setMobileMenuOpen } = useUIStore();
 
   // ===== Busca
   const [q, setQ] = useState("");
@@ -100,8 +104,18 @@ export default function TopBar() {
       <div className="glass rounded-none border-0">
         <div className="mx-auto max-w-[1600px] px-3 sm:px-4 py-2.5">
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Espaço reservado para alinhar com a largura do sidebar colapsado/expandido */}
-            <div className="hidden md:block w-20" aria-hidden />
+            {/* Menu (celular): no desktop a sidebar fica sempre visível */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="surface-soft-hover grid h-9 w-9 shrink-0 place-items-center rounded-lg md:hidden"
+              aria-label="Abrir menu"
+              title="Abrir menu"
+              aria-controls="app-mobile-menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              <FontAwesomeIcon icon={faBars} className="h-4 w-4" />
+            </button>
 
             {/* Busca */}
             <div className="flex-1">

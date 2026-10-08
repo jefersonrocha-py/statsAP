@@ -254,9 +254,9 @@ export default function AdminPage() {
 
       <section className="glass space-y-3 rounded-2xl p-4">
         <h2 className="text-base font-semibold">Convidar usuário</h2>
-        <form onSubmit={sendInvite} className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
+        <form onSubmit={sendInvite} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto]">
           <input
-            className="surface-field rounded-xl px-3 py-2"
+            className="surface-field w-full rounded-xl px-3 py-2"
             placeholder="E-mail do convidado"
             type="email"
             aria-label="E-mail do convidado"
@@ -265,7 +265,7 @@ export default function AdminPage() {
             required
           />
           <select
-            className="surface-field rounded-xl px-3 py-2"
+            className="surface-field w-full rounded-xl py-2 pl-3 pr-10"
             aria-label="Perfil de acesso"
             value={inviteForm.role}
             onChange={(event) => setInviteForm({ ...inviteForm, role: event.target.value as UserRole })}

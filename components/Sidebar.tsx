@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChartPie,
+  faChevronLeft,
+  faChevronRight,
   faFilter,
   faGear,
   faLocationDot,
@@ -11,22 +13,18 @@ import {
   faShieldHalved,
   faTriangleExclamation,
   faUsers,
+  faXmark,
 } from "@fortawesome/free-solid-svg-icons";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UrlObject } from "url";
+import BrandMark from "@components/BrandMark";
+import { APP_VERSION_LABEL } from "@lib/version";
 import { useUIStore } from "@store/ui";
 import { connectSSE } from "@services/sseClient";
 
-const ETHERIUM_LOGO = {
-  src: "/logo_etherium.png",
-  alt: "Etheriumtech",
-  width: 346,
-  height: 369,
-} as const;
-
-const SIDEBAR_VERSION = "V.1.1.0";
+const SIDEBAR_BACKGROUND =
+  "linear-gradient(180deg, rgba(16,78,76,1) 0%, rgba(30,41,41,1) 42%, rgba(12,129,96,0.92) 100%)";
 
 type Role = "SUPERADMIN" | "ADMIN" | "USER";
 type MeResponse =
@@ -45,13 +43,13 @@ type NavItemProps = {
   href: UrlObject;
   icon: any;
   label: string;
-  open: boolean;
+  expanded: boolean;
   active: boolean;
   onClick?: () => void;
 };
 
 type SidebarContentProps = {
-  open: boolean;
+  expanded: boolean;
   role: Role | null;
   userName: string;
   clockLabel: string;
@@ -59,10 +57,10 @@ type SidebarContentProps = {
   stats: { total: number; up: number; down: number };
   pathname: string;
   onNavigate?: () => void;
-  mobile?: boolean;
+  onClose?: () => void;
 };
 
-function NavItem({ href, icon, label, open, active, onClick }: NavItemProps) {
+function NavItem({ href, icon, label, expanded, active, onClick }: NavItemProps) {
   return (
     <Link
       href={href}
@@ -70,49 +68,33 @@ function NavItem({ href, icon, label, open, active, onClick }: NavItemProps) {
       onClick={onClick}
       prefetch={false}
       className={`group flex items-center gap-3 rounded-2xl px-3 py-2.5 transition ${
+        expanded ? "" : "justify-center"
+      } ${
         active ? "bg-white/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]" : ""
       } hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400`}
       aria-current={active ? "page" : undefined}
     >
       <FontAwesomeIcon className="h-4 w-4 shrink-0" icon={icon} />
-      {open ? <span className="text-sm">{label}</span> : <span className="sr-only">{label}</span>}
+      {expanded ? <span className="text-sm">{label}</span> : <span className="sr-only">{label}</span>}
     </Link>
   );
 }
 
-function Hamburger({
-  open,
-  onClick,
-  title,
-}: {
-  open: boolean;
-  onClick: () => void;
-  title?: string;
-}) {
-  const barBase = "absolute block h-[2px] w-5 rounded-full bg-current";
+// Botão redondo na borda direita da sidebar do desktop: « recolhe, » expande.
+function CollapseToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const label = collapsed ? "Expandir menu" : "Recolher menu";
 
   return (
     <button
       type="button"
-      onClick={onClick}
-      aria-label={title || "Menu"}
-      aria-expanded={open}
+      onClick={onToggle}
+      aria-label={label}
+      title={label}
+      aria-expanded={!collapsed}
       aria-controls="app-sidebar"
-      aria-pressed={open}
-      title={title || "Menu"}
-      className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 transition-[background,transform] duration-200 active:scale-[0.98] hover:bg-black/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 dark:bg-white/10 dark:hover:bg-white/20"
+      className="absolute -right-3.5 top-[18px] z-10 grid h-7 w-7 place-items-center rounded-full border border-white/25 bg-[rgb(16,78,76)] text-white shadow-[0_6px_16px_-6px_rgba(2,6,23,0.6)] transition hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
     >
-      <span
-        aria-hidden
-        className={`absolute inset-0 rounded-xl transition-shadow duration-300 ${
-          open ? "shadow-[0_0_0_8px_rgba(16,185,129,.10)]" : "shadow-none"
-        }`}
-      />
-      <span
-        className={`${barBase} -translate-y-1.5`}
-      />
-      <span className={barBase} />
-      <span className={`${barBase} translate-y-1.5`} />
+      <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronLeft} className="h-3 w-3" />
     </button>
   );
 }
@@ -136,23 +118,25 @@ function WelcomePanel({
           <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/60">{dateLabel}</div>
         </div>
       </div>
-
     </div>
   );
 }
 
 function SidebarFooterPanel({
-  open,
+  expanded,
   stats,
 }: {
-  open: boolean;
+  expanded: boolean;
   stats: { total: number; up: number; down: number };
 }) {
-  if (!open) {
+  if (!expanded) {
     return (
       <div className="space-y-2 p-2">
         <MiniStatus label="ON" value={stats.up} tone="emerald" />
         <MiniStatus label="OFF" value={stats.down} tone="rose" />
+        {APP_VERSION_LABEL ? (
+          <div className="text-center text-[10px] tracking-[0.12em] text-white/50">{APP_VERSION_LABEL}</div>
+        ) : null}
       </div>
     );
   }
@@ -166,6 +150,9 @@ function SidebarFooterPanel({
           Total monitorado: <strong className="text-white">{stats.total}</strong>
         </div>
       </div>
+      {APP_VERSION_LABEL ? (
+        <div className="text-center text-[11px] tracking-[0.16em] text-white/50">Stats A.P {APP_VERSION_LABEL}</div>
+      ) : null}
     </div>
   );
 }
@@ -220,7 +207,7 @@ function MiniStatus({
 }
 
 function SidebarContent({
-  open,
+  expanded,
   role,
   userName,
   clockLabel,
@@ -228,10 +215,9 @@ function SidebarContent({
   stats,
   pathname,
   onNavigate,
-  mobile = false,
+  onClose,
 }: SidebarContentProps) {
   const canManage = role === "ADMIN" || role === "SUPERADMIN";
-  const navClick = mobile ? onNavigate : undefined;
   const links: NavLink[] = [
     { path: "/", href: { pathname: "/" }, icon: faMap, label: "Mapa" },
     { path: "/dashboard", href: { pathname: "/dashboard" }, icon: faChartPie, label: "Dashboard" },
@@ -257,98 +243,70 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex min-h-[64px] items-center gap-2 border-b border-white/10 p-3">
-        {open ? (
-          <>
-            <div className="rounded-2xl border border-black/10 bg-white/95 px-3 py-2 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.7)]">
-              <Image
-                src={ETHERIUM_LOGO.src}
-                alt={ETHERIUM_LOGO.alt}
-                width={ETHERIUM_LOGO.width}
-                height={ETHERIUM_LOGO.height}
-                className="h-10 w-auto"
-                priority
-              />
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="rounded-full border border-white/10 bg-black/15 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/65">
-                {SIDEBAR_VERSION}
-              </span>
-              <Hamburger
-                open={open}
-                onClick={onNavigate || (() => undefined)}
-                title={mobile ? "Fechar menu" : "Expandir ou recolher"}
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <Hamburger
-              open={open}
-              onClick={onNavigate || (() => undefined)}
-              title={mobile ? "Fechar menu" : "Expandir ou recolher"}
-            />
-            <div className="grid h-11 w-11 place-items-center rounded-2xl border border-black/10 bg-white/95 p-2 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.7)]">
-              <Image
-                src={ETHERIUM_LOGO.src}
-                alt={ETHERIUM_LOGO.alt}
-                width={ETHERIUM_LOGO.width}
-                height={ETHERIUM_LOGO.height}
-                className="h-full w-auto max-w-full object-contain"
-                priority
-              />
-            </div>
-          </>
-        )}
+      <div
+        className={`flex min-h-[64px] items-center border-b border-white/10 px-4 py-3 ${
+          expanded ? "justify-between" : "justify-center"
+        }`}
+      >
+        <Link
+          href={{ pathname: "/" }}
+          prefetch={false}
+          onClick={onNavigate}
+          className="rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+          title="Stats A.P"
+        >
+          <BrandMark variant={expanded ? "full" : "icon"} inverted />
+        </Link>
+
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar menu"
+            title="Fechar menu"
+            className="grid h-9 w-9 place-items-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+          >
+            <FontAwesomeIcon icon={faXmark} className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
 
-      {open ? (
-        <WelcomePanel
-          userName={userName}
-          clockLabel={clockLabel}
-          dateLabel={dateLabel}
-        />
-      ) : null}
+      {expanded ? <WelcomePanel userName={userName} clockLabel={clockLabel} dateLabel={dateLabel} /> : null}
 
-      <nav className="space-y-1 overflow-y-auto p-2">
+      <nav className="space-y-1 overflow-y-auto p-2" aria-label="Menu principal">
         {links.map((link) => (
           <NavItem
             key={link.path}
             href={link.href}
             icon={link.icon}
             label={link.label}
-            open={open}
+            expanded={expanded}
             active={isActive(link.path)}
-            onClick={navClick}
+            onClick={onNavigate}
           />
         ))}
 
         {role === "SUPERADMIN" && (
           <>
-            {open ? (
-              <div className="mt-4 px-3 text-xs uppercase tracking-[0.22em] text-white/50">
-                Administração
-              </div>
+            {expanded ? (
+              <div className="mt-4 px-3 text-xs uppercase tracking-[0.22em] text-white/50">Administração</div>
             ) : (
-              <div className="mt-3" />
+              <div className="mx-3 mt-3 border-t border-white/10" />
             )}
             <NavItem
               href={{ pathname: "/admin" }}
               icon={faShieldHalved}
               label="Painel"
-              open={open}
+              expanded={expanded}
               active={isActive("/admin")}
-              onClick={navClick}
+              onClick={onNavigate}
             />
           </>
         )}
       </nav>
 
       <div className="mt-auto">
-        <SidebarFooterPanel
-          open={open}
-          stats={stats}
-        />
+        <SidebarFooterPanel expanded={expanded} stats={stats} />
       </div>
     </div>
   );
@@ -356,20 +314,25 @@ function SidebarContent({
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, setSidebarOpen } = useUIStore();
+  const { sidebarCollapsed, setSidebarCollapsed, mobileMenuOpen, setMobileMenuOpen } = useUIStore();
   const [role, setRole] = useState<Role | null>(null);
   const [userName, setUserName] = useState("Usuário");
   const [stats, setStats] = useState({ total: 0, up: 0, down: 0 });
   const [now, setNow] = useState<Date | null>(null);
 
+  // A gaveta do celular fecha ao trocar de página e com Esc.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname, setMobileMenuOpen]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSidebarOpen(false);
+      if (event.key === "Escape") setMobileMenuOpen(false);
     };
 
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [setSidebarOpen]);
+  }, [setMobileMenuOpen]);
 
   useEffect(() => {
     setNow(new Date());
@@ -465,65 +428,55 @@ export default function Sidebar() {
 
   const firstName = useMemo(() => userName.trim().split(/\s+/)[0] || "Usuário", [userName]);
 
+  const contentProps = {
+    role,
+    userName: firstName,
+    clockLabel,
+    dateLabel,
+    stats,
+    pathname,
+  };
+
   return (
     <>
-      <div
-        onClick={() => setSidebarOpen(false)}
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] transition-opacity md:hidden ${
-          sidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        aria-hidden={!sidebarOpen}
-      />
-
+      {/* Desktop: fixa, recolhível. */}
       <aside
         id="app-sidebar"
-        className={`fixed left-0 top-0 z-50 hidden h-screen flex-col text-white transition-all duration-300 ease-out md:flex ${
-          sidebarOpen ? "md:w-72" : "md:w-20"
+        aria-label="Navegação"
+        className={`fixed left-0 top-0 z-50 hidden h-screen flex-col text-white transition-[width] duration-300 ease-out md:flex ${
+          sidebarCollapsed ? "md:w-20" : "md:w-72"
         }`}
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(16,78,76,1) 0%, rgba(30,41,41,1) 42%, rgba(12,129,96,0.92) 100%)",
-        }}
+        style={{ background: SIDEBAR_BACKGROUND }}
       >
-        <SidebarContent
-          open={sidebarOpen}
-          role={role}
-          userName={firstName}
-          clockLabel={clockLabel}
-          dateLabel={dateLabel}
-          stats={stats}
-          pathname={pathname}
-          onNavigate={() => setSidebarOpen(!sidebarOpen)}
-        />
+        <SidebarContent expanded={!sidebarCollapsed} {...contentProps} />
+        <CollapseToggle collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       </aside>
+
+      {/* Celular: gaveta aberta pelo botão ☰ do topo. */}
+      <div
+        onClick={() => setMobileMenuOpen(false)}
+        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] transition-opacity md:hidden ${
+          mobileMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        aria-hidden
+      />
 
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen w-80 flex-col text-white transition-transform duration-300 md:hidden ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        id="app-mobile-menu"
+        aria-label="Navegação"
+        aria-hidden={!mobileMenuOpen}
+        className={`fixed left-0 top-0 z-50 flex h-screen w-72 max-w-[85vw] flex-col text-white transition-[transform,visibility] duration-300 md:hidden ${
+          mobileMenuOpen ? "visible translate-x-0" : "invisible -translate-x-full"
         }`}
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(16,78,76,1) 0%, rgba(30,41,41,1) 42%, rgba(12,129,96,0.92) 100%)",
-        }}
-        aria-hidden={!sidebarOpen}
+        style={{ background: SIDEBAR_BACKGROUND }}
       >
         <SidebarContent
-          open={true}
-          role={role}
-          userName={firstName}
-          clockLabel={clockLabel}
-          dateLabel={dateLabel}
-          stats={stats}
-          pathname={pathname}
-          onNavigate={() => setSidebarOpen(false)}
-          mobile
+          expanded
+          {...contentProps}
+          onNavigate={() => setMobileMenuOpen(false)}
+          onClose={() => setMobileMenuOpen(false)}
         />
       </aside>
-
-      <div
-        aria-hidden
-        className={`hidden transition-[width] duration-300 md:block ${sidebarOpen ? "w-72" : "w-20"}`}
-      />
     </>
   );
 }

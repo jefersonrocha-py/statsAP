@@ -4,8 +4,8 @@ import ThemeScript from "@components/ThemeScript";
 import ThemeSync from "@components/ThemeSync";
 
 export const metadata: Metadata = {
-  title: "Etherium Antennas",
-  description: "Monitoramento de antenas",
+  title: "Stats A.P",
+  description: "Monitoramento dos APs Grandstream da Etheriumtech: mapa, status, clientes e ocorrências.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

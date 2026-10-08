@@ -147,16 +147,16 @@ function IncidentsView() {
           ))}
         </div>
 
-        <div className="grid gap-3 md:grid-cols-[1fr_280px]">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_280px]">
           <input
-            className="surface-field rounded-xl px-3 py-2"
+            className="surface-field w-full rounded-xl px-3 py-2"
             placeholder="Buscar por nome do AP..."
             aria-label="Buscar por nome do AP"
             value={queryInput}
             onChange={(event) => setQueryInput(event.target.value)}
           />
           <select
-            className="surface-field rounded-xl px-3 py-2"
+            className="surface-field w-full rounded-xl py-2 pl-3 pr-10"
             aria-label="Filtrar por rede"
             value={network}
             onChange={(event) => {
@@ -252,14 +252,17 @@ function IncidentsView() {
           </table>
         </div>
 
-        <PaginationControls
-          page={data?.page ?? page}
-          totalPages={data?.totalPages ?? 1}
-          totalItems={data?.totalCount ?? 0}
-          pageSize={PAGE_SIZE}
-          onPageChange={setPage}
-          itemLabel="ocorrências"
-        />
+        {data && (
+          <PaginationControls
+            page={data.page}
+            totalPages={data.totalPages}
+            totalItems={data.totalCount}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+            itemLabel="ocorrências"
+            emptyLabel="Nenhuma ocorrência"
+          />
+        )}
       </section>
 
       {selectedId !== null && (

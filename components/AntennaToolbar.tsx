@@ -48,7 +48,7 @@ export default function AntennaToolbar({
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(220px,1fr)_140px_auto]">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(220px,1fr)_180px_auto]">
         <label className="space-y-1">
           <span className="text-xs uppercase tracking-[0.18em] opacity-65">Buscar</span>
           <input
@@ -64,7 +64,7 @@ export default function AntennaToolbar({
           <select
             value={network}
             onChange={(event) => onNetworkChange(event.target.value)}
-            className="surface-field w-full rounded-2xl px-4 py-3 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+            className="surface-field w-full rounded-2xl py-3 pl-4 pr-10 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
           >
             <option value="">Todas as redes</option>
             {networks.map((item) => (
@@ -80,7 +80,7 @@ export default function AntennaToolbar({
           <select
             value={String(pageSize)}
             onChange={(event) => onPageSizeChange(Number(event.target.value))}
-            className="surface-field w-full rounded-2xl px-4 py-3 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
+            className="surface-field w-full rounded-2xl py-3 pl-4 pr-10 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30"
           >
             {[10, 25, 50, 100].map((size) => (
               <option key={size} value={size}>

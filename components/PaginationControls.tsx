@@ -7,6 +7,8 @@ type Props = {
   pageSize: number;
   onPageChange: (page: number) => void;
   itemLabel?: string;
+  // Texto quando não há itens, com a concordância certa (ex.: "Nenhuma ocorrência").
+  emptyLabel?: string;
 };
 
 export default function PaginationControls({
@@ -16,6 +18,7 @@ export default function PaginationControls({
   pageSize,
   onPageChange,
   itemLabel = "itens",
+  emptyLabel = "Nenhum item encontrado",
 }: Props) {
   const safeTotalPages = Math.max(1, totalPages);
   const safePage = Math.max(1, Math.min(page, safeTotalPages));
@@ -26,7 +29,7 @@ export default function PaginationControls({
     <div className="surface-soft mt-4 flex flex-col gap-3 rounded-2xl px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
       <div className="opacity-75">
         {totalItems === 0
-          ? `Nenhum ${itemLabel}`
+          ? emptyLabel
           : `Mostrando ${start}-${end} de ${totalItems} ${itemLabel}`}
       </div>
 

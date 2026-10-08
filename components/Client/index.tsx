@@ -62,11 +62,14 @@ export default function Client({
             Total de clientes
           </div>
           <div className="mt-1 text-3xl font-semibold text-emerald-700 dark:text-emerald-200">
-            {fmtInt(totalClients)}
+            {isLoading ? "…" : fmtInt(totalClients)}
           </div>
           <div className="mt-1 text-xs opacity-70">
-            {fmtInt(totalNetworks)} {totalNetworks === 1 ? "rede" : "redes"}
-            {lastUpdatedLabel ? ` · Atualizado em ${lastUpdatedLabel}` : ""}
+            {isLoading
+              ? "Consultando o GWN…"
+              : `${fmtInt(totalNetworks)} ${totalNetworks === 1 ? "rede" : "redes"}${
+                  lastUpdatedLabel ? ` · Atualizado em ${lastUpdatedLabel}` : ""
+                }`}
           </div>
         </div>
       </div>

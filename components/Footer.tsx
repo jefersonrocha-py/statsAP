@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import Image from "next/image";
+import BrandMark from "@components/BrandMark";
+import { APP_VERSION_LABEL } from "@lib/version";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLinkedin } from "@fortawesome/free-brands-svg-icons";
@@ -14,7 +15,7 @@ const CONTACT = {
 
 const CHANNELS = [
   { href: "https://etheriumtech.com.br", label: "Site", icon: faGlobe },
-  { href: `mailto:${CONTACT.email}`, label: "Email", icon: faEnvelope },
+  { href: `mailto:${CONTACT.email}`, label: "E-mail", icon: faEnvelope },
 ] as const;
 
 const TEAM = [
@@ -36,7 +37,7 @@ const TEAM = [
 ] as const;
 
 const PRODUCT_COPY =
-  "Stats A.P monitora APs Grandstream via GDMS, consolida status online/offline, exporta a base operacional e oferece visibilidade em mapa, dashboard e configurações.";
+  "Stats A.P monitora APs Grandstream via GDMS, consolida status online/offline, registra ocorrências de queda com histórico de auditoria e oferece visibilidade em mapa e dashboard.";
 
 export default function Footer() {
   const year = useMemo(() => new Date().getFullYear(), []);
@@ -55,13 +56,7 @@ export default function Footer() {
       <div className="relative z-10 px-4 py-6 md:px-6 md:py-8">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
           <div className="space-y-4">
-            <Image
-              src="/logo_etherium.png"
-              alt="Etheriumtech"
-              width={320}
-              height={88}
-              className="h-12 w-auto"
-            />
+            <BrandMark />
 
             <p className="max-w-2xl text-sm leading-6 opacity-85 md:text-[15px]">{PRODUCT_COPY}</p>
 
@@ -70,12 +65,12 @@ export default function Footer() {
               className="surface-soft-hover inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/20"
             >
               <FontAwesomeIcon icon={faEnvelope} className="h-4 w-4" />
-              Fale conosco por email
+              Fale conosco por e-mail
             </a>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-3">
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="min-w-0 space-y-3">
               <h2 className="text-sm font-semibold uppercase tracking-[0.22em] opacity-65">Contato</h2>
               <ContactLine icon={faEnvelope} href={`mailto:${CONTACT.email}`} label={CONTACT.email} />
               <ContactLine icon={faLocationDot} label={CONTACT.address} />
@@ -110,7 +105,9 @@ export default function Footer() {
           </div>
 
           <div className="flex flex-col items-start gap-3 lg:items-end">
-            <p className="text-xs opacity-70">&copy; {year} Todos os direitos reservados.</p>
+            <p className="text-xs opacity-70">
+              &copy; {year} Todos os direitos reservados.{APP_VERSION_LABEL ? ` · Stats A.P ${APP_VERSION_LABEL}` : ""}
+            </p>
           </div>
         </div>
       </div>
@@ -129,10 +126,10 @@ function ContactLine({
 }) {
   const content = (
     <>
-      <span className="surface-soft inline-flex h-9 w-9 items-center justify-center rounded-full">
+      <span className="surface-soft inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
         <FontAwesomeIcon icon={icon} className="h-4 w-4" />
       </span>
-      <span className="text-sm opacity-85">{label}</span>
+      <span className="min-w-0 pt-2 text-sm opacity-85 [overflow-wrap:anywhere]">{label}</span>
     </>
   );
 

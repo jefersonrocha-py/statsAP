@@ -354,6 +354,7 @@ export default function FilterClusterPage() {
           pageSize={pageSize}
           onPageChange={setPage}
           itemLabel="APs"
+          emptyLabel="Nenhum AP encontrado"
         />
       </section>
     </div>

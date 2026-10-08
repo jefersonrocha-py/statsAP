@@ -15,18 +15,24 @@ export default function DashboardPage() {
   useEffect(() => {
     let active = true;
 
+    // Os totais locais vêm do banco e chegam na hora; os clientes dependem do GWN (mais lento).
+    // Carregados separadamente, os cards não ficam presos esperando o GWN.
     async function loadStats() {
-      const [statsResult, networkClientStatsResult] = await Promise.all([
-        api<Stats>("/api/stats").catch(() => null),
-        api<NetworkClientStatsResponse>("/api/stats/network-clients").catch(() => null),
-      ]);
-      if (!active) return;
-      setStats(statsResult || null);
-      setNetworkClientStats(networkClientStatsResult || null);
+      const statsResult = await api<Stats>("/api/stats").catch(() => null);
+      if (active) setStats(statsResult || null);
+    }
+
+    async function loadClientStats() {
+      const result = await api<NetworkClientStatsResponse>("/api/stats/network-clients").catch(() => null);
+      if (active) setNetworkClientStats(result || null);
     }
 
     loadStats();
-    const refreshTimer = window.setInterval(loadStats, 60_000);
+    loadClientStats();
+    const refreshTimer = window.setInterval(() => {
+      loadStats();
+      loadClientStats();
+    }, 60_000);
 
     const disconnect = connectSSE((event) => {
       try {

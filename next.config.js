@@ -1,11 +1,16 @@
 // next.config.js
 const path = require("path");
+const { version } = require("./package.json");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
   poweredByHeader: false,
+  // Fonte única da versão exibida na interface (sidebar e rodapé).
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
