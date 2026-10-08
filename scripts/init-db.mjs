@@ -39,12 +39,13 @@ async function runOnce(connection, name, statements) {
   console.log(`Migration applied: ${name}`);
 }
 
-// APs que já estavam offline na implantação ganham ocorrência, sem disparar e-mail.
+// APs que já estavam offline na implantação ganham ocorrência com alertas suprimidos:
+// nenhum e-mail de queda nem de normalização, e a tela não finge que houve alerta.
 const INCIDENT_BACKFILL_V1 = [
-  `INSERT INTO \`Incident\` (\`antennaId\`, \`antennaName\`, \`networkName\`, \`status\`, \`wentDownAt\`, \`lastDownAt\`, \`alertSentAt\`, \`createdAt\`, \`updatedAt\`)
+  `INSERT INTO \`Incident\` (\`antennaId\`, \`antennaName\`, \`networkName\`, \`status\`, \`wentDownAt\`, \`lastDownAt\`, \`alertsSuppressed\`, \`createdAt\`, \`updatedAt\`)
    SELECT a.\`id\`, LEFT(a.\`name\`, 80), a.\`networkName\`, 'OPEN',
           COALESCE(a.\`lastStatusChange\`, UTC_TIMESTAMP()), COALESCE(a.\`lastStatusChange\`, UTC_TIMESTAMP()),
-          UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP()
+          1, UTC_TIMESTAMP(), UTC_TIMESTAMP()
    FROM \`Antenna\` a
    WHERE a.\`gdmsApId\` IS NOT NULL
      AND a.\`status\` = 'DOWN'
@@ -73,6 +74,12 @@ const INCIDENT_BACKFILL_V1 = [
       "User",
       "notificationsSeenAt",
       "ALTER TABLE `User` ADD COLUMN `notificationsSeenAt` DATETIME NULL"
+    );
+    await ensureColumn(
+      connection,
+      "Incident",
+      "alertsSuppressed",
+      "ALTER TABLE `Incident` ADD COLUMN `alertsSuppressed` TINYINT(1) NOT NULL DEFAULT 0 AFTER `recoveryAlertSentAt`"
     );
     await runOnce(connection, "incident_backfill_v1", INCIDENT_BACKFILL_V1);
     console.log("Database schema is ready.");

@@ -106,7 +106,7 @@ export async function applyIncidentTransition(
 
     case "wentDownAgain": {
       await dbExecute(
-        "UPDATE `Incident` SET `downCount` = ?, `lastDownAt` = ?, `recoveredAt` = NULL, `alertSentAt` = NULL, `recoveryAlertSentAt` = NULL, `updatedAt` = ? WHERE `id` = ?",
+        "UPDATE `Incident` SET `downCount` = ?, `lastDownAt` = ?, `recoveredAt` = NULL, `alertSentAt` = NULL, `recoveryAlertSentAt` = NULL, `alertsSuppressed` = 0, `updatedAt` = ? WHERE `id` = ?",
         [plan.downCount, at, at, plan.incidentId],
         connection
       );

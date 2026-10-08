@@ -185,6 +185,7 @@ CREATE TABLE IF NOT EXISTS `Incident` (
   `downCount` INT NOT NULL DEFAULT 1,
   `alertSentAt` DATETIME NULL,
   `recoveryAlertSentAt` DATETIME NULL,
+  `alertsSuppressed` TINYINT(1) NOT NULL DEFAULT 0,  -- 1 = sem e-mails (carga inicial)
   `resolvedAt` DATETIME NULL,
   `resolvedById` INT NULL,
   `resolvedByName` VARCHAR(100) NULL,
@@ -231,7 +232,7 @@ Disparo: toda transição de status de um AP, vinda do sync ou do PATCH manual (
 
 | Evento | Sem ocorrência não resolvida do AP | Com ocorrência `OPEN` ou `IN_PROGRESS` |
 | --- | --- | --- |
-| UP → DOWN | Cria ocorrência `OPEN` (`wentDownAt = lastDownAt = agora`) + evento `OPENED` | Evento `WENT_DOWN_AGAIN`; `downCount + 1`; `lastDownAt = agora`; limpa `recoveredAt`, `alertSentAt` e `recoveryAlertSentAt` |
+| UP → DOWN | Cria ocorrência `OPEN` (`wentDownAt = lastDownAt = agora`) + evento `OPENED` | Evento `WENT_DOWN_AGAIN`; `downCount + 1`; `lastDownAt = agora`; limpa `recoveredAt`, `alertSentAt`, `recoveryAlertSentAt` e `alertsSuppressed` |
 | DOWN → UP | Nada | Grava `recoveredAt` + evento `RECOVERED` (duração desde `lastDownAt`). Se `OPEN`: passa a `RESOLVED`, `resolution = AUTO_RECOVERED`, evento `AUTO_RESOLVED`. Se `IN_PROGRESS`: continua aberta até um operador resolver |
 
 Ações manuais (ADMIN e SUPERADMIN; USER apenas visualiza):
@@ -244,13 +245,13 @@ Ações manuais (ADMIN e SUPERADMIN; USER apenas visualiza):
 
 `wentDownAt` é o momento em que o sync detectou a queda (precisão de até 5 minutos, o intervalo do worker).
 
-**Carga inicial (migração única `incident_backfill_v1`):** para cada AP com `gdmsApId` e `status = 'DOWN'`, cria ocorrência `OPEN` com `wentDownAt = lastDownAt = COALESCE(lastStatusChange, UTC_TIMESTAMP())`, `alertSentAt = UTC_TIMESTAMP()` (sem e-mail) e evento `OPENED` "Ocorrência criada na implantação (o AP já estava offline)".
+**Carga inicial (migração única `incident_backfill_v1`):** para cada AP com `gdmsApId` e `status = 'DOWN'`, cria ocorrência `OPEN` com `wentDownAt = lastDownAt = COALESCE(lastStatusChange, UTC_TIMESTAMP())` e `alertsSuppressed = 1` (sem e-mail de queda nem de normalização; `alertSentAt` fica vazio para a tela não indicar um alerta que não houve) e evento `OPENED` "Ocorrência criada na implantação (o AP já estava offline)".
 
 ### 7.3 Alerta por e-mail
 
 `processIncidentAlerts(now)` roda no fim de cada sync (a cada 5 minutos pelo worker):
 
-1. **Queda:** ocorrências não resolvidas, com `recoveredAt IS NULL`, `alertSentAt IS NULL` e `lastDownAt <= now - INCIDENT_ALERT_MIN_MINUTES` → **um único e-mail-resumo** por ciclo, com AP, rede, desde quando e duração; marca `alertSentAt` e registra `ALERT_SENT`.
+1. **Queda:** ocorrências não resolvidas, com `recoveredAt IS NULL`, `alertSentAt IS NULL`, `alertsSuppressed = 0` e `lastDownAt <= now - INCIDENT_ALERT_MIN_MINUTES` → **um único e-mail-resumo** por ciclo, com AP, rede, desde quando e duração; marca `alertSentAt` e registra `ALERT_SENT`.
 2. **Normalização:** ocorrências com `alertSentAt` preenchido, `recoveredAt` preenchido e `recoveryAlertSentAt IS NULL` → um e-mail-resumo "APs normalizados"; marca `recoveryAlertSentAt` e registra `RECOVERY_ALERT_SENT`.
 
 - Destinatários: usuários ADMIN e SUPERADMIN ativos (não bloqueados nem suspensos).

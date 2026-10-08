@@ -64,7 +64,7 @@ export async function processIncidentAlerts(now = new Date()): Promise<IncidentA
   const threshold = new Date(now.getTime() - config.minMinutes * 60_000);
 
   const down = await dbQuery<AlertRow>(
-    `SELECT \`id\`, \`antennaName\`, \`networkName\`, \`lastDownAt\` FROM \`Incident\` WHERE \`status\` <> 'RESOLVED' AND \`recoveredAt\` IS NULL AND \`alertSentAt\` IS NULL AND \`lastDownAt\` <= ? ORDER BY \`lastDownAt\` ASC LIMIT ${MAX_INCIDENTS_PER_DIGEST_QUERY}`,
+    `SELECT \`id\`, \`antennaName\`, \`networkName\`, \`lastDownAt\` FROM \`Incident\` WHERE \`status\` <> 'RESOLVED' AND \`recoveredAt\` IS NULL AND \`alertSentAt\` IS NULL AND \`alertsSuppressed\` = 0 AND \`lastDownAt\` <= ? ORDER BY \`lastDownAt\` ASC LIMIT ${MAX_INCIDENTS_PER_DIGEST_QUERY}`,
     [threshold]
   );
   if (down.length) {

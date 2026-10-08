@@ -85,6 +85,7 @@ describe("applyIncidentTransition", () => {
 
     const [sql, params] = vi.mocked(dbExecute).mock.calls[0];
     expect(sql).toContain("`alertSentAt` = NULL");
+    expect(sql).toContain("`alertsSuppressed` = 0");
     expect(params).toEqual([2, at, at, 12]);
     expect(executedTypes()).toEqual(["WENT_DOWN_AGAIN"]);
   });

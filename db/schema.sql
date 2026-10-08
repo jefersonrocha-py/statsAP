@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS `Incident` (
   `downCount` INT NOT NULL DEFAULT 1,
   `alertSentAt` DATETIME NULL,
   `recoveryAlertSentAt` DATETIME NULL,
+  `alertsSuppressed` TINYINT(1) NOT NULL DEFAULT 0,
   `resolvedAt` DATETIME NULL,
   `resolvedById` INT NULL,
   `resolvedByName` VARCHAR(100) NULL,

@@ -47,6 +47,18 @@ describe("processIncidentAlerts", () => {
     expect(events?.[1]).toEqual(expect.arrayContaining([1, "ALERT_SENT", 2, "ALERT_SENT"]));
   });
 
+  it("não alerta ocorrências com alertas suprimidos (carga inicial da implantação)", async () => {
+    vi.mocked(dbQuery)
+      .mockResolvedValueOnce(recipients as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never);
+
+    await processIncidentAlerts(now);
+
+    const downSql = String(vi.mocked(dbQuery).mock.calls[1][0]);
+    expect(downSql).toContain("`alertsSuppressed` = 0");
+  });
+
   it("não marca nada quando o SMTP falha (tenta de novo no próximo ciclo)", async () => {
     vi.mocked(dbQuery)
       .mockResolvedValueOnce(recipients as never)
