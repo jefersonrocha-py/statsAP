@@ -14,6 +14,7 @@ import maplibregl, {
 
 import { api } from "@services/api";
 import { connectSSE } from "@services/sseClient";
+import RotationControl from "@components/map/RotationControl";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -27,11 +28,6 @@ import {
   faCircleXmark,
   faBroom,
   faLocationCrosshairs,
-  faCompass,
-  faChevronUp,
-  faChevronRight,
-  faChevronDown,
-  faChevronLeft,
 } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 
@@ -76,7 +72,6 @@ const TILE_LIGHT: BasemapDefinition = {
   attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
 };
 
-const JOYSTICK_RADIUS = 26;
 const MAP_MIN_ZOOM = 8;
 const MARKER_BASE_WIDTH = 32;
 
@@ -145,16 +140,6 @@ function buildPopupContent(antenna: Antenna) {
   return root;
 }
 
-function normalizeBearing(value: number) {
-  const normalized = value % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
-
-function getBearingLabel(value: number) {
-  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-  return directions[Math.round(normalizeBearing(value) / 45) % directions.length];
-}
-
 function buildMapStyle(basemap: BasemapKey): StyleSpecification {
   const base = basemap === "sat" ? TILE_SAT : TILE_LIGHT;
 
@@ -192,7 +177,7 @@ export default function MapClient() {
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [bearing, setBearing] = useState(0);
+  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
 
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "UP" | "DOWN">("ALL");
@@ -206,8 +191,6 @@ export default function MapClient() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [basemap, setBasemap] = useState<BasemapKey>("sat");
-  const [joystickActive, setJoystickActive] = useState(false);
-  const [joystickOpen, setJoystickOpen] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
 
   const canManage = role === "ADMIN" || role === "SUPERADMIN";
@@ -215,15 +198,6 @@ export default function MapClient() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const appliedBasemapRef = useRef<BasemapKey>("sat");
-  const joystickRef = useRef<HTMLDivElement | null>(null);
-  const joystickPointerIdRef = useRef<number | null>(null);
-
-  const syncBearing = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    setBearing(map.getBearing());
-  }, []);
-
   const fitCity = useCallback((animate = true) => {
     const map = mapRef.current;
     if (!map) return;
@@ -232,6 +206,8 @@ export default function MapClient() {
       padding: 24,
       duration: animate ? 600 : 0,
       maxZoom: 13,
+      // Sem bearing explícito o maplibre volta a rotação para 0°.
+      bearing: map.getBearing(),
     });
   }, []);
 
@@ -329,6 +305,7 @@ export default function MapClient() {
     });
 
     mapRef.current = map;
+    setMapInstance(map);
     map.addControl(
       new NavigationControl({ showCompass: false, showZoom: true, visualizePitch: false }),
       "bottom-right",
@@ -336,7 +313,6 @@ export default function MapClient() {
 
     const handleInitialLoad = () => {
       setMapReady(true);
-      syncBearing();
       fitCity(false);
     };
     const handleMapError = (event: { error?: Error; sourceId?: string }) => {
@@ -353,7 +329,7 @@ export default function MapClient() {
       if (appliedBasemapRef.current === "sat") {
         appliedBasemapRef.current = "light";
         setBasemap("light");
-        setMapError("Camada satelite indisponivel no momento. Mapa alterado para OSM.");
+        setMapError("Camada de satélite indisponível no momento. O mapa foi alterado para OSM.");
         return;
       }
 
@@ -364,7 +340,6 @@ export default function MapClient() {
     const resizeObserver = new ResizeObserver(handleResize);
 
     map.once("load", handleInitialLoad);
-    map.on("rotate", syncBearing);
     map.on("error", handleMapError);
 
     resizeObserver.observe(container);
@@ -375,15 +350,15 @@ export default function MapClient() {
       resizeObserver.disconnect();
       window.removeEventListener("resize", handleResize);
       document.removeEventListener("fullscreenchange", handleResize);
-      map.off("rotate", syncBearing);
       map.off("error", handleMapError);
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = [];
       setMapReady(false);
+      setMapInstance(null);
       map.remove();
       mapRef.current = null;
     };
-  }, [fitCity, syncBearing]);
+  }, [fitCity]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -499,7 +474,7 @@ export default function MapClient() {
 
     if (openModal && tempPos) {
       const previewMarker = new maplibregl.Marker({
-        element: makeMarkerElement("#38bdf8", "Posicao selecionada", 1, true),
+        element: makeMarkerElement("#38bdf8", "Posição selecionada", 1, true),
         anchor: "bottom",
         rotationAlignment: "viewport",
         pitchAlignment: "viewport",
@@ -529,6 +504,7 @@ export default function MapClient() {
       padding: 28,
       duration: 600,
       maxZoom: filtered.length === 1 ? 17 : 18,
+      bearing: map.getBearing(),
     });
   }, [filtered]);
 
@@ -541,12 +517,12 @@ export default function MapClient() {
       const lonNum = Number(lon.toString().replace(",", "."));
 
       if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
-        setErr("Latitude/Longitude invalidas.");
+        setErr("Latitude/longitude inválidas.");
         return;
       }
 
       if (latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
-        setErr("Fora do intervalo geografico.");
+        setErr("Coordenadas fora do intervalo geográfico.");
         return;
       }
 
@@ -574,7 +550,7 @@ export default function MapClient() {
         setDesc("");
         setOpenModal(false);
       } catch (error: any) {
-        setErr(error?.message || "Erro ao salvar.");
+        setErr(error?.message || "Não foi possível salvar o AP.");
       } finally {
         setSaving(false);
       }
@@ -582,214 +558,13 @@ export default function MapClient() {
     [desc, lat, lon, name, saving],
   );
 
-  const handleBearingChange = useCallback((value: number) => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.setBearing(value);
-  }, []);
-
-  const resetBearing = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    map.easeTo({
-      bearing: 0,
-      duration: 300,
-    });
-  }, []);
-
-  const setBearingPreset = useCallback((value: number) => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    map.easeTo({
-      bearing: value,
-      duration: 220,
-    });
-  }, []);
-
-  const updateBearingFromPointer = useCallback(
-    (clientX: number, clientY: number) => {
-      const joystick = joystickRef.current;
-      if (!joystick) return;
-
-      const rect = joystick.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const dx = clientX - centerX;
-      const dy = clientY - centerY;
-      const distance = Math.hypot(dx, dy);
-
-      if (distance < 10) return;
-
-      const angle = normalizeBearing((Math.atan2(dx, -dy) * 180) / Math.PI);
-      handleBearingChange(angle > 180 ? angle - 360 : angle);
-    },
-    [handleBearingChange],
-  );
-
-  const clearJoystickInteraction = useCallback(() => {
-    joystickPointerIdRef.current = null;
-    setJoystickActive(false);
-  }, []);
-
-  const handleJoystickPointerDown = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      joystickPointerIdRef.current = event.pointerId;
-      setJoystickActive(true);
-      event.currentTarget.setPointerCapture(event.pointerId);
-      updateBearingFromPointer(event.clientX, event.clientY);
-    },
-    [updateBearingFromPointer],
-  );
-
-  const handleJoystickPointerMove = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      if (joystickPointerIdRef.current !== event.pointerId) return;
-      updateBearingFromPointer(event.clientX, event.clientY);
-    },
-    [updateBearingFromPointer],
-  );
-
-  const finishJoystickInteraction = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      if (joystickPointerIdRef.current !== event.pointerId) return;
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-      clearJoystickInteraction();
-    },
-    [clearJoystickInteraction],
-  );
-
-  const heading = useMemo(() => normalizeBearing(bearing), [bearing]);
-  const headingLabel = useMemo(() => getBearingLabel(bearing), [bearing]);
-  const joystickVector = useMemo(() => {
-    const radians = (heading * Math.PI) / 180;
-    return {
-      x: Math.sin(radians) * JOYSTICK_RADIUS,
-      y: -Math.cos(radians) * JOYSTICK_RADIUS,
-    };
-  }, [heading]);
 
   return (
     <div id="map-root" className="relative h-[calc(100vh-8rem)] w-full overflow-hidden rounded-xl shadow-inner">
       <div ref={mapContainerRef} className="h-full w-full" />
 
-      <div className="pointer-events-none absolute left-4 top-4 z-[1005] flex flex-col gap-2">
-        <button
-          onClick={() => setJoystickOpen((value) => !value)}
-          className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950/82 text-white shadow-lg ring-1 ring-white/10 backdrop-blur-sm hover:bg-slate-900/90"
-          title={joystickOpen ? "Fechar controle de rotacao" : "Abrir controle de rotacao"}
-          aria-label={joystickOpen ? "Fechar controle de rotacao" : "Abrir controle de rotacao"}
-        >
-          <FontAwesomeIcon
-            icon={faCompass}
-            className="h-4 w-4 text-sky-300 transition-transform"
-            style={{ transform: `rotate(${-bearing}deg)` }}
-          />
-        </button>
-
-        {joystickOpen && (
-          <div
-            className="pointer-events-auto relative w-[142px] rounded-[22px] bg-slate-950/92 p-3 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-md"
-            role="dialog"
-            aria-label="Controle de rotacao do mapa"
-          >
-            <button
-              onClick={() => setJoystickOpen(false)}
-              className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"
-              title="Fechar controle"
-              aria-label="Fechar controle"
-            >
-              <FontAwesomeIcon icon={faXmark} className="h-3 w-3" />
-            </button>
-
-            <div className="pr-6 text-[10px] uppercase tracking-[0.18em] text-white/45">Rotacao</div>
-            <div className="pr-6 text-xs font-semibold text-white/85">
-              {Math.round(heading)}&deg; {headingLabel}
-            </div>
-
-            <div className="mt-3 flex justify-center">
-              <div
-                ref={joystickRef}
-                onPointerDown={handleJoystickPointerDown}
-                onPointerMove={handleJoystickPointerMove}
-                onPointerUp={finishJoystickInteraction}
-                onPointerCancel={finishJoystickInteraction}
-                onLostPointerCapture={clearJoystickInteraction}
-                className={`relative h-[104px] w-[104px] touch-none select-none rounded-full border border-white/10
-                  bg-[radial-gradient(circle_at_30%_30%,rgba(148,163,184,0.22),rgba(71,85,105,0.35)_45%,rgba(2,6,23,0.96)_100%)]
-                  shadow-[inset_0_10px_22px_rgba(255,255,255,0.10),inset_0_-14px_24px_rgba(0,0,0,0.58),0_16px_24px_rgba(2,6,23,0.42)]
-                  ${joystickActive ? "ring-2 ring-sky-400/65" : ""}`}
-                title="Arraste para girar o mapa"
-                aria-label="Joystick de rotacao do mapa"
-              >
-                <div className="absolute left-1/2 top-1 -translate-x-1/2 text-[11px] font-semibold tracking-[0.16em] text-white/90">N</div>
-                <div className="absolute inset-[10px] rounded-full border border-white/12" />
-                <div className="absolute inset-[19px] rounded-full border border-white/10 bg-black/20" />
-
-                <button
-                  type="button"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={resetBearing}
-                  className="absolute left-1/2 top-[14px] inline-flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-black/25 text-sky-300 hover:bg-white/10"
-                  title="Alinhar para norte"
-                  aria-label="Alinhar para norte"
-                >
-                  <FontAwesomeIcon icon={faChevronUp} className="h-3 w-3" />
-                </button>
-
-                <button
-                  type="button"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={() => setBearingPreset(90)}
-                  className="absolute right-[14px] top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-sky-300 hover:bg-white/10"
-                  title="Virar para leste"
-                  aria-label="Virar para leste"
-                >
-                  <FontAwesomeIcon icon={faChevronRight} className="h-3 w-3" />
-                </button>
-
-                <button
-                  type="button"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={() => setBearingPreset(180)}
-                  className="absolute bottom-[14px] left-1/2 inline-flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-black/25 text-sky-300 hover:bg-white/10"
-                  title="Virar para sul"
-                  aria-label="Virar para sul"
-                >
-                  <FontAwesomeIcon icon={faChevronDown} className="h-3 w-3" />
-                </button>
-
-                <button
-                  type="button"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={() => setBearingPreset(-90)}
-                  className="absolute left-[14px] top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/25 text-sky-300 hover:bg-white/10"
-                  title="Virar para oeste"
-                  aria-label="Virar para oeste"
-                >
-                  <FontAwesomeIcon icon={faChevronLeft} className="h-3 w-3" />
-                </button>
-
-                <div className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/55" />
-                <div
-                  className="absolute left-1/2 top-1/2 h-8 w-[3px] -translate-x-1/2 -translate-y-full rounded-full bg-sky-300/30"
-                  style={{ transform: `translate(-50%, -100%) rotate(${heading}deg)` }}
-                />
-                <div
-                  className="absolute left-1/2 top-1/2 h-8 w-8 rounded-full border border-white/12
-                    bg-[radial-gradient(circle_at_30%_30%,#475569,#111827_60%,#020617)] shadow-[0_10px_18px_rgba(0,0,0,0.48)] transition-transform"
-                  style={{
-                    transform: `translate(calc(-50% + ${joystickVector.x}px), calc(-50% + ${joystickVector.y}px)) scale(${joystickActive ? 1.04 : 1})`,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="pointer-events-none absolute left-4 top-4 z-[1005]">
+        <RotationControl map={mapReady ? mapInstance : null} />
       </div>
 
       <div className="absolute right-4 top-4 z-[1005] flex gap-2 pointer-events-none">
@@ -829,7 +604,7 @@ export default function MapClient() {
           title="Mapa base"
           aria-label="Selecionar mapa base"
         >
-          <option value="sat">Satelite</option>
+          <option value="sat">Satélite</option>
           <option value="light">Claro (OSM)</option>
         </select>
       </div>
@@ -896,7 +671,7 @@ export default function MapClient() {
 
           <div className="grid grid-cols-3 gap-2 text-center text-sm">
             <div className="surface-soft rounded-xl p-2">
-              <div className="text-xs opacity-80">Pins</div>
+              <div className="text-xs opacity-80">Pinos</div>
               <div className="text-lg font-semibold">{totals.total}</div>
             </div>
 
@@ -982,7 +757,7 @@ export default function MapClient() {
         >
           <div className="surface-overlay w-full max-w-md rounded-2xl">
             <div className="flex items-center justify-between border-b border-black/10 px-5 py-4 dark:border-white/10">
-              <h3 className="text-lg font-semibold">Nova Antena</h3>
+              <h3 className="text-lg font-semibold">Nova antena</h3>
               <button
                 onClick={() => setOpenModal(false)}
                 className="surface-soft-hover rounded-lg px-2 py-1"
@@ -1021,7 +796,7 @@ export default function MapClient() {
 
               <textarea
                 className="surface-field w-full rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-400"
-                placeholder="Descricao (opcional)"
+                placeholder="Descrição (opcional)"
                 rows={3}
                 value={desc}
                 onChange={(event) => setDesc(event.target.value)}
@@ -1032,7 +807,7 @@ export default function MapClient() {
               )}
 
               <div className="flex items-center justify-between pt-1">
-                <p className="text-xs opacity-80">Dica: clique no mapa com o modal aberto para preencher Lat/Lon.</p>
+                <p className="text-xs opacity-80">Dica: com esta janela aberta, clique no mapa para preencher latitude e longitude.</p>
 
                 <div className="flex gap-2">
                   <button
