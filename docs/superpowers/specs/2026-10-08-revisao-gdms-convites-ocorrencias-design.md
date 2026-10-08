@@ -101,7 +101,7 @@ A rota `app/api/integrations/gdms/sync/route.ts` fica só com autenticação, li
 ### 5.1 Sessão revalidada no banco
 
 - `lib/jwt.ts` (seguro para edge): constantes de cookie, `signAuthToken`, `verifyAuthToken`. O `middleware.ts` passa a importar daqui.
-- `lib/auth.ts` (Node): `requireRequestAuth` verifica o JWT e consulta `User` por `id`. Usuário inexistente, bloqueado ou suspenso → `401 SESSION_REVOKED`. O papel (`role`) usado na autorização vem do banco, não do token.
+- `lib/auth.ts` (Node): `requireRequestAuth` verifica o JWT e consulta `User` por `id`. Usuário inexistente, bloqueado ou suspenso → `401 SESSION_REVOKED`, e essa resposta **apaga os cookies** `auth` e `csrf`. Sem isso, o middleware (que só valida a assinatura) mandaria o usuário de `/login` de volta para `/` em laço. O papel (`role`) usado na autorização vem do banco, não do token.
 - `/api/me` devolve os dados do banco.
 - `services/api.ts`: resposta 401 redireciona para `/login`. As páginas que usam `fetch` direto (admin, settings) passam a usar o helper.
 
@@ -179,7 +179,8 @@ CREATE TABLE IF NOT EXISTS `Incident` (
   `networkName` VARCHAR(255) NULL,
   `status` VARCHAR(20) NOT NULL DEFAULT 'OPEN',      -- OPEN | IN_PROGRESS | RESOLVED
   `resolution` VARCHAR(20) NULL,                      -- MANUAL | AUTO_RECOVERED
-  `wentDownAt` DATETIME NOT NULL,
+  `wentDownAt` DATETIME NOT NULL,                    -- primeira queda (abertura)
+  `lastDownAt` DATETIME NOT NULL,                    -- queda mais recente (base do alerta e da duração)
   `recoveredAt` DATETIME NULL,
   `downCount` INT NOT NULL DEFAULT 1,
   `alertSentAt` DATETIME NULL,
@@ -190,8 +191,9 @@ CREATE TABLE IF NOT EXISTS `Incident` (
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `Incident_status_wentDownAt_idx` (`status`, `wentDownAt`),
+  KEY `Incident_status_lastDownAt_idx` (`status`, `lastDownAt`),
   KEY `Incident_antennaId_status_idx` (`antennaId`, `status`),
+  KEY `Incident_createdAt_idx` (`createdAt`),
   CONSTRAINT `Incident_antennaId_fkey`
     FOREIGN KEY (`antennaId`) REFERENCES `Antenna` (`id`) ON DELETE SET NULL,
   CONSTRAINT `Incident_resolvedById_fkey`
@@ -229,8 +231,8 @@ Disparo: toda transição de status de um AP, vinda do sync ou do PATCH manual (
 
 | Evento | Sem ocorrência não resolvida do AP | Com ocorrência `OPEN` ou `IN_PROGRESS` |
 | --- | --- | --- |
-| UP → DOWN | Cria ocorrência `OPEN` + evento `OPENED` | Evento `WENT_DOWN_AGAIN`; `downCount + 1`; limpa `recoveredAt`, `alertSentAt` e `recoveryAlertSentAt` |
-| DOWN → UP | Nada | Grava `recoveredAt` + evento `RECOVERED` (com duração). Se `OPEN`: passa a `RESOLVED`, `resolution = AUTO_RECOVERED`, evento `AUTO_RESOLVED`. Se `IN_PROGRESS`: continua aberta até um operador resolver |
+| UP → DOWN | Cria ocorrência `OPEN` (`wentDownAt = lastDownAt = agora`) + evento `OPENED` | Evento `WENT_DOWN_AGAIN`; `downCount + 1`; `lastDownAt = agora`; limpa `recoveredAt`, `alertSentAt` e `recoveryAlertSentAt` |
+| DOWN → UP | Nada | Grava `recoveredAt` + evento `RECOVERED` (duração desde `lastDownAt`). Se `OPEN`: passa a `RESOLVED`, `resolution = AUTO_RECOVERED`, evento `AUTO_RESOLVED`. Se `IN_PROGRESS`: continua aberta até um operador resolver |
 
 Ações manuais (ADMIN e SUPERADMIN; USER apenas visualiza):
 
@@ -242,13 +244,13 @@ Ações manuais (ADMIN e SUPERADMIN; USER apenas visualiza):
 
 `wentDownAt` é o momento em que o sync detectou a queda (precisão de até 5 minutos, o intervalo do worker).
 
-**Carga inicial (migração única `incident_backfill_v1`):** para cada AP com `gdmsApId` e `status = 'DOWN'`, cria ocorrência `OPEN` com `wentDownAt = COALESCE(lastStatusChange, NOW())`, `alertSentAt = NOW()` (sem e-mail) e evento `OPENED` "Ocorrência criada na implantação (o AP já estava offline)".
+**Carga inicial (migração única `incident_backfill_v1`):** para cada AP com `gdmsApId` e `status = 'DOWN'`, cria ocorrência `OPEN` com `wentDownAt = lastDownAt = COALESCE(lastStatusChange, UTC_TIMESTAMP())`, `alertSentAt = UTC_TIMESTAMP()` (sem e-mail) e evento `OPENED` "Ocorrência criada na implantação (o AP já estava offline)".
 
 ### 7.3 Alerta por e-mail
 
 `processIncidentAlerts(now)` roda no fim de cada sync (a cada 5 minutos pelo worker):
 
-1. **Queda:** ocorrências não resolvidas, com `recoveredAt IS NULL`, `alertSentAt IS NULL` e `wentDownAt <= now - INCIDENT_ALERT_MIN_MINUTES` → **um único e-mail-resumo** por ciclo, com AP, rede, desde quando e duração; marca `alertSentAt` e registra `ALERT_SENT`.
+1. **Queda:** ocorrências não resolvidas, com `recoveredAt IS NULL`, `alertSentAt IS NULL` e `lastDownAt <= now - INCIDENT_ALERT_MIN_MINUTES` → **um único e-mail-resumo** por ciclo, com AP, rede, desde quando e duração; marca `alertSentAt` e registra `ALERT_SENT`.
 2. **Normalização:** ocorrências com `alertSentAt` preenchido, `recoveredAt` preenchido e `recoveryAlertSentAt IS NULL` → um e-mail-resumo "APs normalizados"; marca `recoveryAlertSentAt` e registra `RECOVERY_ALERT_SENT`.
 
 - Destinatários: usuários ADMIN e SUPERADMIN ativos (não bloqueados nem suspensos).
