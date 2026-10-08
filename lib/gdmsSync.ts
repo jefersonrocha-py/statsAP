@@ -194,15 +194,19 @@ async function executeSync(mode: SyncMode): Promise<GdmsSyncSummary> {
   }
 
   summary.ok = summary.errors.length === 0;
+  return summary;
+}
 
-  // Alertas não podem derrubar o sync: uma falha aqui fica só no log.
+// Os alertas dependem só do banco: rodam mesmo quando a leitura do GWN falha
+// (senão uma instabilidade do GWN atrasaria o aviso das quedas já registradas).
+// Uma falha aqui fica só no log e não derruba o sync.
+async function runIncidentAlerts(): Promise<GdmsSyncSummary["alerts"]> {
   try {
-    summary.alerts = await processIncidentAlerts(new Date());
+    return await processIncidentAlerts(new Date());
   } catch (error) {
     console.error("runGdmsSync: falha ao processar alertas de ocorrência:", error);
+    return { downSent: 0, recoverySent: 0 };
   }
-
-  return summary;
 }
 
 export async function runGdmsSync(mode: SyncMode): Promise<GdmsSyncSummary> {
@@ -211,7 +215,15 @@ export async function runGdmsSync(mode: SyncMode): Promise<GdmsSyncSummary> {
 
   store.__gdmsSyncRunning = true;
   try {
-    return await executeSync(mode);
+    let summary: GdmsSyncSummary;
+    try {
+      summary = await executeSync(mode);
+    } catch (error) {
+      await runIncidentAlerts();
+      throw error;
+    }
+    summary.alerts = await runIncidentAlerts();
+    return summary;
   } finally {
     store.__gdmsSyncRunning = false;
   }

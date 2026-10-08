@@ -32,6 +32,7 @@ vi.mock("@lib/incidentAlerts", () => ({
 
 import { withTransaction } from "@lib/mysql";
 import { emit } from "@lib/sse";
+import { processIncidentAlerts } from "@lib/incidentAlerts";
 import { listAPsByNetwork, listNetworks } from "@services/gdms";
 import { runGdmsSync, SyncInProgressError } from "@lib/gdmsSync";
 
@@ -124,6 +125,13 @@ describe("runGdmsSync", () => {
   it("processa os alertas de ocorrência ao final do sync", async () => {
     const summary = await runGdmsSync("status");
     expect(summary.alerts).toEqual({ downSent: 2, recoverySent: 0 });
+  });
+
+  it("processa os alertas mesmo quando a leitura do GWN falha", async () => {
+    vi.mocked(listNetworks).mockRejectedValueOnce(new Error("Connect Timeout Error"));
+
+    await expect(runGdmsSync("status")).rejects.toThrow("Connect Timeout Error");
+    expect(processIncidentAlerts).toHaveBeenCalledTimes(1);
   });
 
   it("recusa execução simultânea", async () => {
