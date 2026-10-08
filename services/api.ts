@@ -68,6 +68,20 @@ export interface AntennaNetworksResponse {
   items: string[];
 }
 
+export interface GdmsSyncSummary {
+  ok: boolean;
+  mode: "full" | "status";
+  networks: number;
+  totalFetched: number;
+  created: number;
+  updated: number;
+  statusChanged: number;
+  coordsUpdated: number;
+  withoutCoords: number;
+  errors: Array<{ apId: string; reason: string }>;
+  at: string;
+}
+
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function readCookie(name: string) {
