@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AUTH_COOKIE_NAME, verifyAuthToken } from "@lib/jwt";
 
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password", "/accept-invite"];
+// Páginas públicas que redirecionam quem já está logado para o início.
+const GUEST_ONLY_PATHS = ["/login", "/forgot-password", "/reset-password"];
 const PUBLIC_FILE = /\.[^/]+$/;
 
 function isPublic(pathname: string) {
@@ -103,7 +105,7 @@ export async function middleware(req: NextRequest) {
   }
 
   if (isPublic(pathname)) {
-    if (PUBLIC_PATHS.includes(pathname) && token) {
+    if (GUEST_ONLY_PATHS.includes(pathname) && token) {
       try {
         await verifyAuthToken(token);
         return redirectWithHeaders(new URL("/", req.url));
