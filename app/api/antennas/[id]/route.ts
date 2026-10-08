@@ -8,7 +8,8 @@ import { mapAntennaRow } from "@lib/dbMappers";
 import { mapDbError } from "@lib/dbErrors";
 import { dbExecute, dbQueryOne, withTransaction } from "@lib/mysql";
 import { checkRateLimit, rateLimitResponse } from "@lib/rateLimit";
-import { emit } from "@lib/sse";
+import { emit, emitAll } from "@lib/sse";
+import { recordStatusTransition } from "@lib/statusChanges";
 import { antennaUpdateSchema } from "@lib/validators";
 
 const patchSchema = antennaUpdateSchema.pick({
@@ -103,7 +104,7 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
   const now = new Date();
 
   try {
-    const item = await withTransaction(async (connection) => {
+    const { row: item, emits } = await withTransaction(async (connection) => {
       const assignments: string[] = [];
       const values: Array<string | Date> = [];
 
@@ -133,39 +134,31 @@ export async function PATCH(req: Request, ctx: { params: { id: string } }) {
         connection
       );
 
-      if (statusChanged && data.status) {
-        await dbExecute(
-          "INSERT INTO `StatusHistory` (`antennaId`, `status`, `changedAt`) VALUES (?, ?, ?)",
-          [idNum, data.status, now],
-          connection
-        );
-      }
-
       const row = await dbQueryOne<AntennaRow>(
         "SELECT * FROM `Antenna` WHERE `id` = ? LIMIT 1",
         [idNum],
         connection
       );
-
       if (!row) {
         throw new Error("UPDATED_ANTENNA_NOT_FOUND");
       }
 
-      return row;
+      const emits = statusChanged
+        ? await recordStatusTransition(connection, {
+            antennaId: idNum,
+            antennaName: row.name,
+            networkName: row.networkName,
+            previousStatus: before.status,
+            status: data.status as "UP" | "DOWN",
+            at: now,
+          })
+        : [];
+
+      return { row, emits };
     });
 
-    if (statusChanged && data.status) {
-      emit("status.changed", {
-        id: idNum,
-        name: item.name,
-        networkName: item.networkName,
-        previousStatus: before.status,
-        status: data.status,
-        at: now.toISOString(),
-      });
-    } else {
-      emit("antenna.updated", { id: idNum });
-    }
+    if (emits.length) emitAll(emits);
+    else emit("antenna.updated", { id: idNum });
 
     return NextResponse.json({ ok: true, item: mapAntennaRow(item) });
   } catch (e) {

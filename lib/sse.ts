@@ -48,3 +48,10 @@ function safeEnqueue(c: Client, text: string) {
     return false;
   }
 }
+
+export type PendingEmit = { event: string; payload: Record<string, unknown> };
+
+// Eventos montados dentro de uma transação só são emitidos depois do commit.
+export function emitAll(events: PendingEmit[]) {
+  for (const item of events) emit(item.event, item.payload);
+}
