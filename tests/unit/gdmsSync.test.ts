@@ -94,7 +94,20 @@ describe("runGdmsSync", () => {
 
     expect(summary.created).toBe(1);
     expect(db.executed.some((query) => query.sql.startsWith("INSERT INTO `Antenna`"))).toBe(true);
-    expect(emit).toHaveBeenCalledWith("antenna.created", expect.objectContaining({ name: "AP Novo" }));
+  });
+
+  it("agrupa criações e mudanças de posição num único evento por sync (sem rajada no mapa)", async () => {
+    vi.mocked(listAPsByNetwork).mockResolvedValue([
+      { ...apExisting, status: "UP" },
+      apNew,
+      { ...apNew, apId: "AA:03", apName: "AP Novo 2" },
+    ]);
+
+    await runGdmsSync("full");
+
+    const updatedCalls = vi.mocked(emit).mock.calls.filter(([event]) => event === "antenna.updated");
+    expect(updatedCalls).toEqual([["antenna.updated", { kind: "sync", created: 2, changed: 1 }]]);
+    expect(vi.mocked(emit).mock.calls.some(([event]) => event === "antenna.created")).toBe(false);
   });
 
   it("aplica uma única vez o AP que aparece em duas redes", async () => {

@@ -192,8 +192,8 @@ sequenceDiagram
 
 | Modo | Endpoint | Efeito |
 | --- | --- | --- |
-| Full sync | `POST /api/integrations/gdms/sync` | Cria APs novos, atualiza metadados, tenta preencher coordenadas faltantes, registra historico e emite `antenna.created`, `antenna.updated` e `status.changed` |
-| Status-only | `POST /api/integrations/gdms/sync?mode=status` | Atualiza somente APs ja existentes, grava mudancas de status e funciona como modo padrao do worker |
+| Full sync | `POST /api/integrations/gdms/sync` | Cria APs novos, atualiza metadados, aplica a posição do GWN (o GWN sempre vence quando informa coordenadas), registra histórico e ocorrências, e emite `status.changed` por AP e um único `antenna.updated` agrupado por sync |
+| Status-only | `POST /api/integrations/gdms/sync?mode=status` | Atualiza status e posição dos APs já existentes (não cria novos), processa os alertas de ocorrência e é o modo padrão do worker |
 | Ping | `GET /api/integrations/gdms/ping` | Valida token + acesso remoto sem persistir inventario |
 | Token info/refresh | `GET`/`POST /api/integrations/gdms/token` | Observa expiracao e forca renovacao OAuth |
 

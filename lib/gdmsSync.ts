@@ -88,12 +88,8 @@ async function applyPlan(
       [result.insertId, values.status, now],
       connection
     );
-    return [
-      {
-        event: "antenna.created",
-        payload: { id: result.insertId, name: values.name, networkName: values.networkName, status: values.status },
-      },
-    ];
+    // Criações viram um único evento agrupado no fim do sync (ver executeSync).
+    return [];
   }
 
   const assignments = ["`status` = ?", "`lastSyncAt` = ?", "`updatedAt` = ?"];
@@ -130,15 +126,7 @@ async function applyPlan(
     });
   }
 
-  if (plan.coordsChanged || plan.metadataChanged) {
-    return [
-      {
-        event: "antenna.updated",
-        payload: { id: plan.antennaId, name: plan.antennaName, networkName: plan.networkName, kind: "sync" },
-      },
-    ];
-  }
-
+  // Mudanças de posição/nome viram um único evento agrupado no fim do sync (ver executeSync).
   return [];
 }
 
@@ -147,6 +135,7 @@ async function executeSync(mode: SyncMode): Promise<GdmsSyncSummary> {
   const networks = await listNetworks();
   const local = await loadLocalAntennas();
   const seen = new Set<string>();
+  let changedAntennas = 0;
 
   const summary: GdmsSyncSummary = {
     ok: true,
@@ -186,11 +175,18 @@ async function executeSync(mode: SyncMode): Promise<GdmsSyncSummary> {
           summary.updated++;
           if (plan.statusChanged) summary.statusChanged++;
           if (plan.coordsChanged) summary.coordsUpdated++;
+          if (plan.coordsChanged || plan.metadataChanged) changedAntennas++;
         }
       } catch (error: any) {
         summary.errors.push({ apId: ap.apId, reason: error?.message ?? String(error) });
       }
     }
+  }
+
+  // Um evento por sync em vez de um por AP: o primeiro sync aplica centenas de posições e cada
+  // evento faz as telas abertas recarregarem a lista inteira de APs.
+  if (summary.created > 0 || changedAntennas > 0) {
+    emitAll([{ event: "antenna.updated", payload: { kind: "sync", created: summary.created, changed: changedAntennas } }]);
   }
 
   summary.ok = summary.errors.length === 0;
