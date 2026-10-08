@@ -47,6 +47,7 @@ export interface NetworkClientStat {
 
 export interface NetworkClientStatsResponse {
   ok: boolean;
+  source?: string;
   totalNetworks: number;
   totalClients: number;
   generatedAt: string;

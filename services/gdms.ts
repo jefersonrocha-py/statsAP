@@ -215,10 +215,28 @@ export async function listAPsByNetwork(nid: string, networkName: string): Promis
   return out;
 }
 
+// Clientes conectados agora, segundo o GWN: total da lista de clientes ativos da rede.
+// (A soma de ap.clients do ap/list não bate com o portal; ver spec 1.1.)
+export async function countActiveClients(networkId: string): Promise<number> {
+  const json = await postJson<{ data?: { total?: number | string } }>("/oapi/v1.0.0/client/list", {
+    search: "",
+    order: "",
+    pageNum: 1,
+    pageSize: 1,
+    networkId: Number(networkId),
+    filter: { ssidId: "all_ssid" },
+  });
+  const total = Number(json.data?.total ?? 0);
+  return Number.isFinite(total) && total > 0 ? Math.floor(total) : 0;
+}
+
 export async function listConnectedClientsByNetwork(): Promise<NetworkClientStat[]> {
   const networks = await listNetworks();
   const stats = await mapWithConcurrency(networks, 4, async (network) => {
-    const aps = await listAPsByNetwork(network.id, network.networkName ?? "");
+    const [aps, clients] = await Promise.all([
+      listAPsByNetwork(network.id, network.networkName ?? ""),
+      countActiveClients(network.id),
+    ]);
     const onlineAps = aps.reduce((sum, ap) => sum + (ap.status === "UP" ? 1 : 0), 0);
 
     return {
@@ -227,7 +245,7 @@ export async function listConnectedClientsByNetwork(): Promise<NetworkClientStat
       aps: aps.length,
       onlineAps,
       offlineAps: Math.max(0, aps.length - onlineAps),
-      clients: 0,
+      clients,
     };
   });
 

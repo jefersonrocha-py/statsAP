@@ -6,7 +6,7 @@ vi.mock("@lib/gdmsToken", () => ({
 }));
 
 import { refreshToken } from "@lib/gdmsToken";
-import { listAPsByNetwork, listNetworks } from "@services/gdms";
+import { countActiveClients, listAPsByNetwork, listNetworks } from "@services/gdms";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -72,6 +72,22 @@ describe("services/gdms", () => {
     expect(refreshToken).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[1][0])).toContain("access_token=token-novo");
+  });
+
+  it("conta clientes ativos pelo total do client/list", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ retCode: 0, data: { total: 30, totalPage: 30, result: [{}] } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(countActiveClients("332714")).resolves.toBe(30);
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/oapi/v1.0.0/client/list");
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      pageNum: 1,
+      pageSize: 1,
+      networkId: 332714,
+      filter: { ssidId: "all_ssid" },
+    });
   });
 
   it("não entra em laço se o 401 persistir", async () => {

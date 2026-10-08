@@ -19,7 +19,7 @@ export default function ClientsPage() {
         setNetworkClientError(null);
       } catch {
         if (!active) return;
-        setNetworkClientError("Nao foi possivel carregar os clientes por network no GDMS agora.");
+        setNetworkClientError("Não foi possível carregar os clientes por rede no GWN agora.");
       }
     }
 

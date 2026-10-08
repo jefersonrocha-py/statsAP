@@ -281,8 +281,8 @@ function DashboardCardsInner({
     connectedClients === null
       ? "Atualizando leitura do GDMS"
       : clientNetworks && clientNetworks > 0
-      ? `${fmtInt(clientNetworks)} network${clientNetworks === 1 ? "" : "s"}`
-      : "Visao geral do GDMS";
+      ? `${fmtInt(clientNetworks)} ${clientNetworks === 1 ? "rede" : "redes"}`
+      : "Visão geral do GDMS";
 
   return (
     <div className={cx("space-y-3", className)}>
@@ -330,7 +330,7 @@ function DashboardCardsInner({
             accent="cyan"
             aria-label={
               connectedClients === null
-                ? "Clientes conectados em atualizacao"
+                ? "Clientes conectados em atualização"
                 : `Clientes conectados: ${fmtInt(connectedClients)}`
             }
           />

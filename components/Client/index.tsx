@@ -1,3 +1,4 @@
+import { formatDateTimeBR } from "@lib/dateFormat";
 import type { NetworkClientStat } from "@services/api";
 
 type Props = {
@@ -11,21 +12,6 @@ type Props = {
 
 function fmtInt(value: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.max(0, Math.floor(value || 0)));
-}
-
-function fmtDateTime(value?: string | null) {
-  if (!value) return null;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
 
 function SkeletonCard() {
@@ -59,15 +45,15 @@ export default function Client({
   isLoading = false,
   error,
 }: Props) {
-  const lastUpdatedLabel = fmtDateTime(generatedAt);
+  const lastUpdatedLabel = generatedAt ? formatDateTimeBR(generatedAt) : null;
 
   return (
     <section className="glass space-y-4 rounded-3xl p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Clientes conectados por network</h2>
+          <h2 className="text-lg font-semibold">Clientes conectados por rede</h2>
           <p className="text-sm opacity-70">
-            Leitura ao vivo do GDMS somando o total de clientes conectados em cada rede.
+            Clientes ativos agora, segundo a lista de clientes conectados do GWN.
           </p>
         </div>
 
@@ -79,8 +65,8 @@ export default function Client({
             {fmtInt(totalClients)}
           </div>
           <div className="mt-1 text-xs opacity-70">
-            {fmtInt(totalNetworks)} network{totalNetworks === 1 ? "" : "s"}
-            {lastUpdatedLabel ? ` | Atualizado em ${lastUpdatedLabel}` : ""}
+            {fmtInt(totalNetworks)} {totalNetworks === 1 ? "rede" : "redes"}
+            {lastUpdatedLabel ? ` · Atualizado em ${lastUpdatedLabel}` : ""}
           </div>
         </div>
       </div>
@@ -106,9 +92,9 @@ export default function Client({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[11px] uppercase tracking-[0.18em] opacity-60">Network</div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] opacity-60">Rede</div>
                   <h3 className="mt-1 break-words text-base font-semibold">
-                    {item.networkName || `Network ${item.networkId}`}
+                    {item.networkName || `Rede ${item.networkId}`}
                   </h3>
                 </div>
 
@@ -132,7 +118,7 @@ export default function Client({
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-black/15 px-4 py-6 text-sm opacity-70 dark:border-white/15">
-          Nenhuma network retornou clientes conectados no GDMS.
+          Nenhuma rede retornou clientes conectados no GWN.
         </div>
       )}
     </section>
