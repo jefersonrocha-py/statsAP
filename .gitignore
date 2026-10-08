@@ -16,3 +16,4 @@ prisma/data/
 *.sqlite
 *.sqlite-journal
 teste.json
+tsconfig.tsbuildinfo

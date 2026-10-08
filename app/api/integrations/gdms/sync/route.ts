@@ -131,8 +131,8 @@ export async function POST(req: Request) {
             }
 
             if (!existing) {
-              const lat = typeof ap.lat === "number" ? ap.lat : 0;
-              const lon = typeof ap.lng === "number" ? ap.lng : 0;
+              const lat = ap.coords?.lat ?? 0;
+              const lon = ap.coords?.lng ?? 0;
               const result = await dbExecute(
                 "INSERT INTO `Antenna` (`name`, `description`, `lat`, `lon`, `status`, `gdmsApId`, `networkId`, `networkName`, `lastSyncAt`, `createdAt`, `updatedAt`) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
@@ -176,7 +176,7 @@ export async function POST(req: Request) {
             const coordsFilled =
               Number(existing.lat) === 0 &&
               Number(existing.lon) === 0 &&
-              (typeof ap.lat === "number" || typeof ap.lng === "number");
+              ap.coords !== null;
             const assignments = [
               "`name` = ?",
               "`networkId` = ?",
@@ -199,15 +199,9 @@ export async function POST(req: Request) {
               values.push(now);
             }
 
-            if (Number(existing.lat) === 0 && Number(existing.lon) === 0) {
-              if (typeof ap.lat === "number") {
-                assignments.push("`lat` = ?");
-                values.push(ap.lat);
-              }
-              if (typeof ap.lng === "number") {
-                assignments.push("`lon` = ?");
-                values.push(ap.lng);
-              }
+            if (ap.coords) {
+              assignments.push("`lat` = ?", "`lon` = ?");
+              values.push(ap.coords.lat, ap.coords.lng);
             }
 
             values.push(existing.id);

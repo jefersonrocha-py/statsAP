@@ -2,7 +2,15 @@ import "server-only";
 
 // services/gdms.ts
 import crypto from "crypto";
-import { getAccessToken } from "@lib/gdmsToken";
+import { getAccessToken, refreshToken } from "@lib/gdmsToken";
+import {
+  normalizeApStatus,
+  parseCoordinatePair,
+  pickApId,
+  pickRawLat,
+  pickRawLng,
+  type Coordinates,
+} from "@lib/gdmsNormalize";
 
 type GdmsEnv = {
   base: string;
@@ -13,6 +21,7 @@ type GdmsEnv = {
 };
 
 const GDMS_TIMEOUT_MS = 20_000;
+const AP_NAME_MAX_LENGTH = 80;
 
 function parseBaseUrl(raw: string) {
   const url = new URL(raw);
@@ -50,9 +59,9 @@ function buildSignature(args: {
   return sha256Hex(seed);
 }
 
-async function postJson<T>(path: string, bodyObj: any): Promise<T> {
+async function postJson<T>(path: string, bodyObj: unknown, retried = false): Promise<T> {
   const { base, appId, secret } = env();
-  const accessToken = await getAccessToken();
+  const accessToken = retried ? (await refreshToken()).accessToken : await getAccessToken();
 
   const body = JSON.stringify(bodyObj);
   const ts = Date.now().toString();
@@ -68,8 +77,13 @@ async function postJson<T>(path: string, bodyObj: any): Promise<T> {
     signal: AbortSignal.timeout(GDMS_TIMEOUT_MS),
   });
 
+  // Token rejeitado pelo GWN (expirado ou revogado): renova e repete uma única vez.
+  if (res.status === 401 && !retried) {
+    return postJson<T>(path, bodyObj, true);
+  }
+
   let json: any;
-  try { json = await res.json(); } catch { json = { err: await res.text() }; }
+  try { json = await res.json(); } catch { json = {}; }
 
   if (!res.ok) throw new Error(`GDMS ${path} failed with status ${res.status}.`);
   if (json?.retCode && String(json.retCode) !== "0") {
@@ -79,7 +93,7 @@ async function postJson<T>(path: string, bodyObj: any): Promise<T> {
 }
 
 type NetworkRow = { id: string | number; networkName?: string };
-type ApRow = { name?: string; status?: number; [k: string]: any };
+type ApRow = Record<string, any>;
 
 export type NormalizedAp = {
   networkId: string;
@@ -87,9 +101,7 @@ export type NormalizedAp = {
   apId: string;
   apName: string;
   status: "UP" | "DOWN";
-  clients: number;
-  lat?: number;
-  lng?: number;
+  coords: Coordinates | null;
 };
 
 export type NetworkClientStat = {
@@ -101,50 +113,9 @@ export type NetworkClientStat = {
   clients: number;
 };
 
-function pickApId(ap: any): string | undefined {
-  const cand =
-    ap.id ??
-    ap.apId ?? ap.ap_id ?? ap.apID ??
-    ap.deviceId ?? ap.device_id ??
-    ap.mac ?? ap.MAC ?? ap.macAddr ?? ap.macAddress ??
-    ap.serialNumber ?? ap.sn ?? ap.SN ??
-    ap.uuid ?? ap.UUID;
-  if (cand === undefined || cand === null) return undefined;
-  const s = String(cand).trim();
-  return s.length ? s : undefined;
-}
-
-function pickLat(ap: any): number | undefined {
-  return (
-    ap.ap_latitude ?? ap.latitude ?? ap.lat ?? ap.Latitude ?? ap.Lat ??
-    ap.gpsLatitude ?? ap.gpsLat ?? ap.gps?.latitude ?? ap.gps?.lat ??
-    ap.locationLatitude ?? ap.location?.latitude ?? ap.location?.lat ??
-    ap.position?.latitude ?? ap.position?.lat ?? undefined
-  );
-}
-function pickLng(ap: any): number | undefined {
-  return (
-    ap.ap_longitude ?? ap.longitude ?? ap.lng ?? ap.Longitude ?? ap.Lng ??
-    ap.gpsLongitude ?? ap.gpsLng ?? ap.gps?.longitude ?? ap.gps?.lng ??
-    ap.locationLongitude ?? ap.location?.longitude ?? ap.location?.lng ??
-    ap.position?.longitude ?? ap.position?.lng ?? undefined
-  );
-}
-
-function pickClients(ap: any): number {
-  const raw =
-    ap.clients ??
-    ap.clientCount ??
-    ap.clientsCount ??
-    ap.clientNum ??
-    ap.stationCount ??
-    ap.stationNum ??
-    ap.stations ??
-    ap.users ??
-    0;
-
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+function pickApName(ap: ApRow, apId: string) {
+  const raw = typeof ap.name === "string" ? ap.name.trim() : "";
+  return (raw || `AP-${apId}`).slice(0, AP_NAME_MAX_LENGTH);
 }
 
 function shouldContinue(pageNum: number, pageSize: number, info: { totalPage?: number; total?: number; received?: number }) {
@@ -229,11 +200,9 @@ export async function listAPsByNetwork(nid: string, networkName: string): Promis
         networkId: nid,
         networkName,
         apId,
-        apName: ap.name ?? `AP-${apId}`,
-        status: (ap.status ?? 0) === 1 ? "UP" : "DOWN",
-        clients: pickClients(ap),
-        lat: pickLat(ap),
-        lng: pickLng(ap),
+        apName: pickApName(ap, apId),
+        status: normalizeApStatus(ap.status),
+        coords: parseCoordinatePair(pickRawLat(ap), pickRawLng(ap)),
       });
     }
 
@@ -246,26 +215,10 @@ export async function listAPsByNetwork(nid: string, networkName: string): Promis
   return out;
 }
 
-export async function listAllAps(): Promise<NormalizedAp[]> {
-  const nets = await listNetworks();
-  const all: NormalizedAp[] = [];
-  for (const n of nets) {
-    const aps = await listAPsByNetwork(n.id, n.networkName ?? "");
-    all.push(...aps);
-  }
-  const seen = new Set<string>();
-  const dedup: NormalizedAp[] = [];
-  for (const ap of all) {
-    if (!seen.has(ap.apId)) { seen.add(ap.apId); dedup.push(ap); }
-  }
-  return dedup;
-}
-
 export async function listConnectedClientsByNetwork(): Promise<NetworkClientStat[]> {
   const networks = await listNetworks();
   const stats = await mapWithConcurrency(networks, 4, async (network) => {
     const aps = await listAPsByNetwork(network.id, network.networkName ?? "");
-    const clients = aps.reduce((sum, ap) => sum + ap.clients, 0);
     const onlineAps = aps.reduce((sum, ap) => sum + (ap.status === "UP" ? 1 : 0), 0);
 
     return {
@@ -274,7 +227,7 @@ export async function listConnectedClientsByNetwork(): Promise<NetworkClientStat
       aps: aps.length,
       onlineAps,
       offlineAps: Math.max(0, aps.length - onlineAps),
-      clients,
+      clients: 0,
     };
   });
 
