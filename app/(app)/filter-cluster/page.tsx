@@ -255,15 +255,15 @@ export default function FilterClusterPage() {
 
       <section className="grid gap-3 md:grid-cols-3">
         <article className="glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.18em] opacity-60">Pagina atual</div>
+          <div className="text-xs uppercase tracking-[0.18em] opacity-60">Página atual</div>
           <div className="mt-2 text-3xl font-semibold">{items.length}</div>
         </article>
         <article className="glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.18em] opacity-60">UP nesta pagina</div>
+          <div className="text-xs uppercase tracking-[0.18em] opacity-60">UP nesta página</div>
           <div className="mt-2 text-3xl font-semibold text-emerald-500">{summary.up}</div>
         </article>
         <article className="glass rounded-2xl p-4">
-          <div className="text-xs uppercase tracking-[0.18em] opacity-60">DOWN nesta pagina</div>
+          <div className="text-xs uppercase tracking-[0.18em] opacity-60">DOWN nesta página</div>
           <div className="mt-2 text-3xl font-semibold text-rose-500">{summary.down}</div>
         </article>
       </section>
@@ -277,9 +277,9 @@ export default function FilterClusterPage() {
                 <th className="p-3 text-left">Rede</th>
                 <th className="p-3 text-left">Latitude</th>
                 <th className="p-3 text-left">Longitude</th>
-                <th className="p-3 text-left">Ultima atualizacao</th>
+                <th className="p-3 text-left">Última atualização</th>
                 <th className="p-3 text-left">Status</th>
-                {canManage && <th className="p-3 text-left">Acoes</th>}
+                {canManage && <th className="p-3 text-left">Ações</th>}
               </tr>
             </thead>
             <tbody>
@@ -321,7 +321,7 @@ export default function FilterClusterPage() {
                             onClick={() => toggleStatus(antenna)}
                             className="rounded-xl bg-brand1 px-3 py-2 text-white transition hover:opacity-90"
                           >
-                            Toggle
+                            Alternar status
                           </button>
                           <button
                             type="button"

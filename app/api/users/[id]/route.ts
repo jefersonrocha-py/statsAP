@@ -37,14 +37,14 @@ const suspendUntilSchema = z
     if (Number.isNaN(parsed.getTime())) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Informe uma data de suspensao valida.",
+        message: "Informe uma data de suspensão válida.",
       });
       return z.NEVER;
     }
     if (parsed.getTime() <= Date.now()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "A suspensao deve terminar no futuro.",
+        message: "A suspensão deve terminar no futuro.",
       });
       return z.NEVER;
     }

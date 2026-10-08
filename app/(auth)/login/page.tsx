@@ -41,23 +41,23 @@ export default function LoginPage() {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
         const apiError = String(payload?.error || "");
-        if (apiError === "INVALID_CREDENTIALS") setError("Credenciais invalidas.");
-        else if (apiError === "ACCOUNT_BLOCKED") setError("Sua conta esta bloqueada. Procure um administrador.");
+        if (apiError === "INVALID_CREDENTIALS") setError("E-mail ou senha incorretos.");
+        else if (apiError === "ACCOUNT_BLOCKED") setError("Sua conta está bloqueada. Procure um administrador.");
         else if (apiError === "ACCOUNT_SUSPENDED") {
-          setError("Sua conta esta suspensa temporariamente. Aguarde a liberacao ou contate um administrador.");
+          setError("Sua conta está suspensa temporariamente. Aguarde a liberação ou fale com um administrador.");
         } else if (apiError === "ORIGIN_MISMATCH" || apiError === "ORIGIN_REQUIRED") {
-          setError("Falha de origem da requisicao. Recarregue a pagina e tente novamente.");
+          setError("Falha de origem da requisição. Recarregue a página e tente novamente.");
         } else if (apiError === "CSRF_INVALID") {
-          setError("Sessao de seguranca invalida. Recarregue a pagina e tente novamente.");
+          setError("Sessão de segurança inválida. Recarregue a página e tente novamente.");
         } else {
-          setError("Nao foi possivel entrar agora.");
+          setError("Não foi possível entrar agora.");
         }
         return;
       }
 
       router.push("/");
     } catch {
-      setError("Nao foi possivel entrar agora.");
+      setError("Não foi possível entrar agora.");
     } finally {
       setBusy(false);
     }
@@ -114,7 +114,7 @@ export default function LoginPage() {
             <AuthInput
               autoComplete="email"
               icon={faEnvelope}
-              placeholder="Email"
+              placeholder="E-mail"
               type="email"
               value={email}
               onChange={setEmail}
@@ -145,7 +145,7 @@ export default function LoginPage() {
               <Link href="/forgot-password" className="underline underline-offset-4 hover:opacity-100">
                 Esqueceu a senha?
               </Link>
-              <span>Solicite o acesso com um administrador.</span>
+              <span>Solicite o acesso a um administrador.</span>
             </div>
           </form>
         </div>

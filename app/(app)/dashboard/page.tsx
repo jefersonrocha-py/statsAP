@@ -84,7 +84,7 @@ export default function DashboardPage() {
         <section className="glass space-y-4 rounded-3xl p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Distribuicao de status</h2>
+              <h2 className="text-lg font-semibold">Distribuição de status</h2>
               <p className="text-sm opacity-70">
                 Compare disponibilidade, indisponibilidade e volume total da base.
               </p>
@@ -104,7 +104,7 @@ export default function DashboardPage() {
                     }`}
                     aria-pressed={chartVariant === variant}
                   >
-                    {variant === "donut" ? "Donut" : variant === "gauge" ? "Gauge" : "Radial"}
+                    {variant === "donut" ? "Rosca" : variant === "gauge" ? "Medidor" : "Radial"}
                   </button>
                 ))}
               </div>

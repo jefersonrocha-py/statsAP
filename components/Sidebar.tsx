@@ -358,7 +358,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen } = useUIStore();
   const [role, setRole] = useState<Role | null>(null);
-  const [userName, setUserName] = useState("Usuario");
+  const [userName, setUserName] = useState("Usuário");
   const [stats, setStats] = useState({ total: 0, up: 0, down: 0 });
   const [now, setNow] = useState<Date | null>(null);
 
@@ -393,10 +393,10 @@ export default function Sidebar() {
 
         if (meJson.ok) {
           setRole(meJson.user.role);
-          setUserName(meJson.user.name || "Usuario");
+          setUserName(meJson.user.name || "Usuário");
         } else {
           setRole(null);
-          setUserName("Usuario");
+          setUserName("Usuário");
         }
 
         if (statsJson.ok) {
@@ -411,7 +411,7 @@ export default function Sidebar() {
       } catch {
         if (alive) {
           setRole(null);
-          setUserName("Usuario");
+          setUserName("Usuário");
           setStats({ total: 0, up: 0, down: 0 });
         }
       }
@@ -463,7 +463,7 @@ export default function Sidebar() {
     [now]
   );
 
-  const firstName = useMemo(() => userName.trim().split(/\s+/)[0] || "Usuario", [userName]);
+  const firstName = useMemo(() => userName.trim().split(/\s+/)[0] || "Usuário", [userName]);
 
   return (
     <>

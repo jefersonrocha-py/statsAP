@@ -76,7 +76,7 @@ export default function AntennaToolbar({
         </label>
 
         <label className="space-y-1">
-          <span className="text-xs uppercase tracking-[0.18em] opacity-65">Pagina</span>
+          <span className="text-xs uppercase tracking-[0.18em] opacity-65">Página</span>
           <select
             value={String(pageSize)}
             onChange={(event) => onPageSizeChange(Number(event.target.value))}
@@ -84,7 +84,7 @@ export default function AntennaToolbar({
           >
             {[10, 25, 50, 100].map((size) => (
               <option key={size} value={size}>
-                {size} por pagina
+                {size} por página
               </option>
             ))}
           </select>

@@ -35,19 +35,19 @@ export default function ForgotPasswordPage() {
       if (!response.ok) {
         setFeedback({
           kind: "error",
-          message: payload?.details?.[0]?.message || "Nao foi possivel processar o pedido agora.",
+          message: payload?.details?.[0]?.message || "Não foi possível processar o pedido agora.",
         });
         return;
       }
 
       setFeedback({
         kind: "success",
-        message: "Se o email informado existir, enviaremos um link de redefinicao em instantes.",
+        message: "Se o e-mail informado estiver cadastrado, enviaremos um link de redefinição em instantes.",
       });
     } catch {
       setFeedback({
         kind: "error",
-        message: "Nao foi possivel processar o pedido agora.",
+        message: "Não foi possível processar o pedido agora.",
       });
     } finally {
       setBusy(false);
@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
               Recuperar acesso
             </div>
             <p className="text-sm">
-              Informe o email da conta para receber o link de redefinicao de senha.
+              Informe o e-mail da conta para receber o link de redefinição de senha.
             </p>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default function ForgotPasswordPage() {
             <AuthInput
               autoComplete="email"
               icon={faEnvelope}
-              placeholder="Email"
+              placeholder="E-mail"
               type="email"
               value={email}
               onChange={setEmail}

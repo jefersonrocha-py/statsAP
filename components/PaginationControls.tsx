@@ -36,7 +36,7 @@ export default function PaginationControls({
           onClick={() => onPageChange(1)}
           disabled={safePage <= 1}
           className="surface-soft-hover rounded-lg px-3 py-1.5 disabled:opacity-40"
-          aria-label="Primeira pagina"
+          aria-label="Primeira página"
         >
           {"<<"}
         </button>
@@ -45,19 +45,19 @@ export default function PaginationControls({
           onClick={() => onPageChange(safePage - 1)}
           disabled={safePage <= 1}
           className="surface-soft-hover rounded-lg px-3 py-1.5 disabled:opacity-40"
-          aria-label="Pagina anterior"
+          aria-label="Página anterior"
         >
           {"<"}
         </button>
         <span className="min-w-28 text-center font-medium">
-          Pagina {safePage} de {safeTotalPages}
+          Página {safePage} de {safeTotalPages}
         </span>
         <button
           type="button"
           onClick={() => onPageChange(safePage + 1)}
           disabled={safePage >= safeTotalPages}
           className="surface-soft-hover rounded-lg px-3 py-1.5 disabled:opacity-40"
-          aria-label="Proxima pagina"
+          aria-label="Próxima página"
         >
           {">"}
         </button>
@@ -66,7 +66,7 @@ export default function PaginationControls({
           onClick={() => onPageChange(safeTotalPages)}
           disabled={safePage >= safeTotalPages}
           className="surface-soft-hover rounded-lg px-3 py-1.5 disabled:opacity-40"
-          aria-label="Ultima pagina"
+          aria-label="Última página"
         >
           {">>"}
         </button>

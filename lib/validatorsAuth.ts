@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 export const PASSWORD_POLICY_ITEMS = [
-  "Minimo de 12 caracteres.",
-  "Pelo menos uma letra minuscula.",
-  "Pelo menos uma letra maiuscula.",
-  "Pelo menos um numero.",
-  "Pelo menos um simbolo.",
+  "Mínimo de 12 caracteres.",
+  "Pelo menos uma letra minúscula.",
+  "Pelo menos uma letra maiúscula.",
+  "Pelo menos um número.",
+  "Pelo menos um símbolo.",
 ] as const;
 
 export const PASSWORD_POLICY_HINT = PASSWORD_POLICY_ITEMS.join(" ");
@@ -13,12 +13,12 @@ export const PASSWORD_POLICY_HINT = PASSWORD_POLICY_ITEMS.join(" ");
 export const strongPasswordSchema = z
   .string()
   .trim()
-  .min(12, "A senha deve ter no minimo 12 caracteres.")
-  .max(72, "A senha pode ter no maximo 72 caracteres.")
-  .regex(/[a-z]/, "A senha deve conter ao menos uma letra minuscula.")
-  .regex(/[A-Z]/, "A senha deve conter ao menos uma letra maiuscula.")
-  .regex(/\d/, "A senha deve conter ao menos um numero.")
-  .regex(/[^A-Za-z0-9]/, "A senha deve conter ao menos um simbolo.");
+  .min(12, "A senha deve ter no mínimo 12 caracteres.")
+  .max(72, "A senha pode ter no máximo 72 caracteres.")
+  .regex(/[a-z]/, "A senha deve conter ao menos uma letra minúscula.")
+  .regex(/[A-Z]/, "A senha deve conter ao menos uma letra maiúscula.")
+  .regex(/\d/, "A senha deve conter ao menos um número.")
+  .regex(/[^A-Za-z0-9]/, "A senha deve conter ao menos um símbolo.");
 
 export const registerSchema = z.object({
   name: z.string().trim().min(2).max(80),

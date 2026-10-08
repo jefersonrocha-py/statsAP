@@ -36,7 +36,7 @@ const TEAM = [
 ] as const;
 
 const PRODUCT_COPY =
-  "Stats A.P monitora APs Grandstream via GDMS, consolida status online/offline, exporta a base operacional e oferece visibilidade em mapa, dashboard e configuracoes.";
+  "Stats A.P monitora APs Grandstream via GDMS, consolida status online/offline, exporta a base operacional e oferece visibilidade em mapa, dashboard e configurações.";
 
 export default function Footer() {
   const year = useMemo(() => new Date().getFullYear(), []);

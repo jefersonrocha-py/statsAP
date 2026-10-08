@@ -30,12 +30,12 @@ export default function ResetPasswordPage() {
     if (busy) return;
 
     if (!token) {
-      setFeedback({ kind: "error", message: "Token de redefinicao ausente ou invalido." });
+      setFeedback({ kind: "error", message: "Link de redefinição ausente ou inválido." });
       return;
     }
 
     if (password !== confirmPassword) {
-      setFeedback({ kind: "error", message: "As senhas informadas nao coincidem." });
+      setFeedback({ kind: "error", message: "As senhas informadas não coincidem." });
       return;
     }
 
@@ -54,18 +54,18 @@ export default function ResetPasswordPage() {
           message:
             payload?.details?.[0]?.message ||
             (payload?.error === "INVALID_RESET_TOKEN"
-              ? "O link de redefinicao e invalido ou expirou."
-              : "Nao foi possivel redefinir a senha."),
+              ? "O link de redefinição é inválido ou expirou."
+              : "Não foi possível redefinir a senha."),
         });
         return;
       }
 
-      setFeedback({ kind: "success", message: "Senha redefinida com sucesso. Voce ja pode entrar." });
+      setFeedback({ kind: "success", message: "Senha redefinida com sucesso. Você já pode entrar." });
       setPassword("");
       setConfirmPassword("");
       window.setTimeout(() => router.push("/login"), 1200);
     } catch {
-      setFeedback({ kind: "error", message: "Nao foi possivel redefinir a senha." });
+      setFeedback({ kind: "error", message: "Não foi possível redefinir a senha." });
     } finally {
       setBusy(false);
     }
@@ -90,7 +90,7 @@ export default function ResetPasswordPage() {
               Nova senha
             </div>
             <p className="text-sm">
-              Defina uma nova senha para concluir a recuperacao de acesso.
+              Defina uma nova senha para concluir a recuperação de acesso.
             </p>
           </div>
         </div>
@@ -100,7 +100,7 @@ export default function ResetPasswordPage() {
             <div className="surface-soft rounded-xl px-3 py-2 text-xs text-muted">
               <div className="mb-1 flex items-center gap-2 font-medium">
                 <FontAwesomeIcon icon={faKey} className="h-3.5 w-3.5" />
-                Politica de senha
+                Política de senha
               </div>
               <div>{PASSWORD_POLICY_HINT}</div>
             </div>
