@@ -84,6 +84,64 @@ export interface GdmsSyncSummary {
   at: string;
 }
 
+export type IncidentStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
+
+export interface IncidentListItem {
+  id: number;
+  antennaId: number | null;
+  antennaName: string;
+  networkName: string | null;
+  status: IncidentStatus;
+  resolution: string | null;
+  wentDownAt: string | null;
+  lastDownAt: string | null;
+  recoveredAt: string | null;
+  downCount: number;
+  alertSentAt: string | null;
+  resolvedAt: string | null;
+  resolvedByName: string | null;
+  offlineSeconds: number;
+}
+
+export interface IncidentEventItem {
+  id: number;
+  type: string;
+  message: string | null;
+  fromStatus: string | null;
+  toStatus: string | null;
+  actorName: string;
+  createdAt: string | null;
+}
+
+export interface IncidentDetail extends IncidentListItem {
+  events: IncidentEventItem[];
+}
+
+export interface IncidentListResponse {
+  ok: boolean;
+  items: IncidentListItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface NotificationItem extends IncidentListItem {
+  isUnread: boolean;
+}
+
+export interface NotificationSummary {
+  ok: boolean;
+  unread: number;
+  openCount: number;
+  items: NotificationItem[];
+}
+
+export interface MeResponse {
+  ok: boolean;
+  user?: { id: string; name: string; email: string; role: "SUPERADMIN" | "ADMIN" | "USER" };
+}
+
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function readCookie(name: string) {
