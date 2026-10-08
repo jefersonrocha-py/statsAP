@@ -1,4 +1,5 @@
 import { formatDateTimeBR } from "@lib/dateFormat";
+import { formatDuration, secondsBetween } from "@lib/incidentFormat";
 import { roleLabel } from "@lib/roles";
 
 // Layout único dos e-mails. Todo texto recebido é tratado como texto puro e escapado no HTML.
@@ -95,5 +96,74 @@ export function buildInviteEmail(input: {
     ],
     action: { label: "Criar meu acesso", url: input.acceptUrl },
     footnote: "Se você não esperava este convite, ignore este e-mail.",
+  });
+}
+
+export type IncidentDigestItem = {
+  antennaName: string;
+  networkName: string | null;
+  since: Date;
+  until?: Date;
+};
+
+const DIGEST_MAX_ITEMS = 100;
+const DIGEST_FOOTNOTE = "Você recebe este aviso por ser administrador do Stats A.P.";
+
+function digestAction(appUrl: string | null) {
+  return appUrl ? { label: "Abrir ocorrências", url: `${appUrl.replace(/\/+$/, "")}/incidents` } : undefined;
+}
+
+export function buildIncidentDownDigest(
+  items: IncidentDigestItem[],
+  opts: { now: Date; appUrl: string | null; minMinutes: number; maxItems?: number }
+): EmailContent {
+  const max = opts.maxItems ?? DIGEST_MAX_ITEMS;
+  const shown = items.slice(0, max);
+  const rest = items.length - shown.length;
+  const paragraphs = [`${items.length} AP(s) estão offline há mais de ${opts.minMinutes} minuto(s).`];
+  if (rest > 0) paragraphs.push(`A lista abaixo mostra os ${shown.length} primeiros, e mais ${rest} AP(s) offline.`);
+
+  return renderEmail({
+    subject: `[Stats A.P] ${items.length} AP(s) offline`,
+    heading: "APs offline",
+    paragraphs,
+    table: {
+      columns: ["AP", "Rede", "Offline desde", "Duração"],
+      rows: shown.map((item) => [
+        item.antennaName,
+        item.networkName ?? "-",
+        formatDateTimeBR(item.since),
+        formatDuration(secondsBetween(item.since, opts.now)),
+      ]),
+    },
+    action: digestAction(opts.appUrl),
+    footnote: DIGEST_FOOTNOTE,
+  });
+}
+
+export function buildIncidentRecoveryDigest(
+  items: IncidentDigestItem[],
+  opts: { appUrl: string | null; maxItems?: number }
+): EmailContent {
+  const max = opts.maxItems ?? DIGEST_MAX_ITEMS;
+  const shown = items.slice(0, max);
+  const rest = items.length - shown.length;
+  const paragraphs = [`${items.length} AP(s) que estavam offline voltaram a ficar online.`];
+  if (rest > 0) paragraphs.push(`A lista abaixo mostra os ${shown.length} primeiros, e mais ${rest} AP(s).`);
+
+  return renderEmail({
+    subject: `[Stats A.P] ${items.length} AP(s) normalizado(s)`,
+    heading: "APs normalizados",
+    paragraphs,
+    table: {
+      columns: ["AP", "Rede", "Ficou offline por"],
+      rows: shown.map((item) => [
+        item.antennaName,
+        item.networkName ?? "-",
+        formatDuration(secondsBetween(item.since, item.until ?? item.since)),
+      ]),
+    },
+    action: digestAction(opts.appUrl),
+    footnote: DIGEST_FOOTNOTE,
   });
 }

@@ -7,6 +7,7 @@ import {
   type LocalAntennaSnapshot,
   type SyncMode,
 } from "@lib/gdmsSyncPlan";
+import { processIncidentAlerts } from "@lib/incidentAlerts";
 import { dbExecute, dbQuery, withTransaction } from "@lib/mysql";
 import { emitAll, type PendingEmit } from "@lib/sse";
 import { recordStatusTransition } from "@lib/statusChanges";
@@ -25,6 +26,7 @@ export type GdmsSyncSummary = {
   coordsUpdated: number;
   withoutCoords: number;
   errors: Array<{ apId: string; reason: string }>;
+  alerts: { downSent: number; recoverySent: number };
   at: string;
 };
 
@@ -157,6 +159,7 @@ async function executeSync(mode: SyncMode): Promise<GdmsSyncSummary> {
     coordsUpdated: 0,
     withoutCoords: 0,
     errors: [],
+    alerts: { downSent: 0, recoverySent: 0 },
     at: now.toISOString(),
   };
 
@@ -191,6 +194,14 @@ async function executeSync(mode: SyncMode): Promise<GdmsSyncSummary> {
   }
 
   summary.ok = summary.errors.length === 0;
+
+  // Alertas não podem derrubar o sync: uma falha aqui fica só no log.
+  try {
+    summary.alerts = await processIncidentAlerts(new Date());
+  } catch (error) {
+    console.error("runGdmsSync: falha ao processar alertas de ocorrência:", error);
+  }
+
   return summary;
 }
 

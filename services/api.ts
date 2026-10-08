@@ -80,6 +80,7 @@ export interface GdmsSyncSummary {
   coordsUpdated: number;
   withoutCoords: number;
   errors: Array<{ apId: string; reason: string }>;
+  alerts?: { downSent: number; recoverySent: number };
   at: string;
 }
 

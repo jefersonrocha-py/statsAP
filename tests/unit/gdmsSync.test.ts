@@ -26,6 +26,10 @@ vi.mock("@lib/sse", () => {
 
 vi.mock("@services/gdms", () => ({ listNetworks: vi.fn(), listAPsByNetwork: vi.fn() }));
 
+vi.mock("@lib/incidentAlerts", () => ({
+  processIncidentAlerts: vi.fn(async () => ({ downSent: 2, recoverySent: 0 })),
+}));
+
 import { withTransaction } from "@lib/mysql";
 import { emit } from "@lib/sse";
 import { listAPsByNetwork, listNetworks } from "@services/gdms";
@@ -115,6 +119,11 @@ describe("runGdmsSync", () => {
 
     expect(summary.ok).toBe(false);
     expect(summary.errors).toEqual([{ apId: "AA:01", reason: "deadlock" }]);
+  });
+
+  it("processa os alertas de ocorrência ao final do sync", async () => {
+    const summary = await runGdmsSync("status");
+    expect(summary.alerts).toEqual({ downSent: 2, recoverySent: 0 });
   });
 
   it("recusa execução simultânea", async () => {

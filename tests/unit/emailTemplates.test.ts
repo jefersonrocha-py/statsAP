@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildInviteEmail, buildPasswordResetEmail, escapeHtml, renderEmail } from "@lib/emailTemplates";
+import {
+  buildIncidentDownDigest,
+  buildIncidentRecoveryDigest,
+  buildInviteEmail,
+  buildPasswordResetEmail,
+  escapeHtml,
+  renderEmail,
+} from "@lib/emailTemplates";
 
 describe("escapeHtml", () => {
   it("escapa os caracteres especiais de HTML", () => {
@@ -52,5 +59,38 @@ describe("buildInviteEmail", () => {
     expect(email.text).toContain("Perfil de acesso: Administrador.");
     expect(email.text).toMatch(/vale até 11\/10\/2026,? 12:00/);
     expect(email.text).toContain("https://stats.test/accept-invite?token=abc");
+  });
+});
+
+describe("resumos de ocorrência", () => {
+  const now = new Date("2026-10-08T12:00:00Z");
+  const item = (index: number) => ({
+    antennaName: `AP ${index}`,
+    networkName: "Rede A",
+    since: new Date("2026-10-08T11:30:00Z"),
+  });
+
+  it("queda em massa vira um único e-mail com no máximo 100 linhas e 'e mais N'", () => {
+    const items = Array.from({ length: 130 }, (_, index) => item(index + 1));
+
+    const email = buildIncidentDownDigest(items, { now, appUrl: "https://stats.test", minMinutes: 10 });
+
+    expect(email.subject).toBe("[Stats A.P] 130 AP(s) offline");
+    expect(email.text.split("\n").filter((line) => line.startsWith("- AP "))).toHaveLength(100);
+    expect(email.text).toContain("e mais 30 AP(s) offline");
+    expect(email.text).toContain("AP 1 | Rede A");
+    expect(email.text).toContain("30 min");
+    expect(email.text).toContain("https://stats.test/incidents");
+  });
+
+  it("resumo de normalização mostra quanto tempo cada AP ficou offline", () => {
+    const email = buildIncidentRecoveryDigest(
+      [{ ...item(1), until: new Date("2026-10-08T13:35:00Z") }],
+      { appUrl: null }
+    );
+
+    expect(email.subject).toBe("[Stats A.P] 1 AP(s) normalizado(s)");
+    expect(email.text).toContain("AP 1 | Rede A | 2 h 05 min");
+    expect(email.html).not.toContain("href=");
   });
 });

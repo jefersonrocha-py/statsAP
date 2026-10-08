@@ -621,6 +621,9 @@ Use [`env.example`](./env.example) como baseline. Abaixo estao as chaves que rea
 | `EMAIL_TRANSPORT_DEFAULT_PASSWORD` | Sim se usar reset por email | `...` | Senha ou app password SMTP |
 | `EMAIL_TRANSPORT_DEFAULT_TLS` | Nao | `true` | Exige TLS no transporte |
 | `PASSBOLT_KEY_EMAIL` | Nao | `noreply@example.com` | Fallback para remetente quando `EMAIL_DEFAULT_FROM` nao estiver definido |
+| `INVITE_TOKEN_HOURS` | Não | `72` | Validade do link de convite (1 a 336 h) |
+| `INCIDENT_ALERTS_ENABLED` | Não | `true` | Liga o e-mail-resumo de APs offline/normalizados para ADMIN e SUPERADMIN |
+| `INCIDENT_ALERT_MIN_MINUTES` | Não | `10` | Tempo offline mínimo antes do alerta (1 a 1440 min); evita alarme por queda rápida |
 
 ### Bootstrap administrativo
 
