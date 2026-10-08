@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheckCircle,
@@ -150,14 +151,23 @@ export default function AntennaStatusNotifications() {
                 {toast.networkName ? (
                   <div className="mt-1 text-xs opacity-75">{toast.networkName}</div>
                 ) : null}
+                {isOffline ? (
+                  <Link
+                    href="/incidents"
+                    onClick={() => removeToast(toast.id)}
+                    className="mt-1 inline-block text-xs font-medium underline underline-offset-4"
+                  >
+                    Ver ocorrências
+                  </Link>
+                ) : null}
               </div>
 
               <button
                 type="button"
                 onClick={() => removeToast(toast.id)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10"
-                aria-label="Fechar notificacao"
-                title="Fechar notificacao"
+                aria-label="Fechar notificação"
+                title="Fechar notificação"
               >
                 <FontAwesomeIcon icon={faXmark} className="h-4 w-4" />
               </button>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useThemeStore } from "@store/theme";
+import NotificationBell from "@components/NotificationBell";
 import { buildApiHeaders } from "@services/api";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -136,17 +137,20 @@ export default function TopBar() {
               <button
                 onClick={toggleFullscreen}
                 className="surface-soft-hover grid h-8 w-8 place-items-center rounded-lg sm:h-9 sm:w-9"
-                title={isFs ? "Sair do Fullscreen do mapa" : "Fullscreen do mapa"}
-                aria-label="Alternar fullscreen do mapa"
+                title={isFs ? "Sair da tela cheia do mapa" : "Tela cheia do mapa"}
+                aria-label="Alternar tela cheia do mapa"
               >
                 <FontAwesomeIcon icon={isFs ? faCompress : faExpand} className="h-4 w-4" />
               </button>
+
+              {/* Notificações de ocorrências */}
+              <NotificationBell />
 
               {/* Tema */}
               <button
                 onClick={toggleTheme}
                 className="surface-soft-hover grid h-8 w-8 place-items-center rounded-lg sm:h-9 sm:w-9"
-                title={isLight ? "Mudar para Dark" : "Mudar para Light"}
+                title={isLight ? "Ativar tema escuro" : "Ativar tema claro"}
                 aria-label="Alternar tema"
               >
                 <FontAwesomeIcon icon={isLight ? faSun : faMoon} className="h-4 w-4" />
