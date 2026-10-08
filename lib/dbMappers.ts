@@ -1,6 +1,6 @@
 import { getUserAccountStatus } from "./userStatus";
 
-function toIso(value: unknown) {
+export function toIso(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const date = value instanceof Date ? value : new Date(String(value));
   return Number.isNaN(date.getTime()) ? null : date.toISOString();

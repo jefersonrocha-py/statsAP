@@ -67,3 +67,20 @@ CREATE TABLE IF NOT EXISTS `gdms_token` (
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `UserInvite` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `email` VARCHAR(200) NOT NULL,
+  `role` VARCHAR(20) NOT NULL DEFAULT 'USER',
+  `tokenHash` CHAR(64) NOT NULL,
+  `invitedById` INT NULL,
+  `expiresAt` DATETIME NOT NULL,
+  `acceptedAt` DATETIME NULL,
+  `revokedAt` DATETIME NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `UserInvite_tokenHash_key` (`tokenHash`),
+  KEY `UserInvite_email_idx` (`email`),
+  CONSTRAINT `UserInvite_invitedById_fkey`
+    FOREIGN KEY (`invitedById`) REFERENCES `User` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

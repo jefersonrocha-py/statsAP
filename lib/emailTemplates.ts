@@ -1,3 +1,6 @@
+import { formatDateTimeBR } from "@lib/dateFormat";
+import { roleLabel } from "@lib/roles";
+
 // Layout único dos e-mails. Todo texto recebido é tratado como texto puro e escapado no HTML.
 
 const BRAND = "Stats A.P · Etheriumtech";
@@ -73,5 +76,24 @@ export function buildPasswordResetEmail(input: { name: string; resetUrl: string;
     paragraphs: ["Recebemos uma solicitação para redefinir a sua senha no Stats A.P."],
     action: { label: "Criar uma nova senha", url: input.resetUrl },
     footnote: `Este link expira em ${input.ttlMinutes} minutos. Se você não solicitou a alteração, ignore este e-mail.`,
+  });
+}
+
+export function buildInviteEmail(input: {
+  acceptUrl: string;
+  role: string;
+  expiresAt: Date;
+  inviterName: string;
+}): EmailContent {
+  return renderEmail({
+    subject: "Convite para acessar o Stats A.P",
+    heading: "Você foi convidado",
+    paragraphs: [
+      `${input.inviterName || "Um administrador"} convidou você para acessar o Stats A.P, a plataforma de monitoramento dos APs da Etheriumtech.`,
+      `Perfil de acesso: ${roleLabel(input.role)}.`,
+      `O link é pessoal, pode ser usado uma única vez e vale até ${formatDateTimeBR(input.expiresAt)} (horário de Brasília).`,
+    ],
+    action: { label: "Criar meu acesso", url: input.acceptUrl },
+    footnote: "Se você não esperava este convite, ignore este e-mail.",
   });
 }

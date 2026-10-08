@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPasswordResetEmail, escapeHtml, renderEmail } from "@lib/emailTemplates";
+import { buildInviteEmail, buildPasswordResetEmail, escapeHtml, renderEmail } from "@lib/emailTemplates";
 
 describe("escapeHtml", () => {
   it("escapa os caracteres especiais de HTML", () => {
@@ -35,5 +35,22 @@ describe("buildPasswordResetEmail", () => {
     expect(email.html).not.toContain("<img");
     expect(email.text).toContain("Este link expira em 60 minutos.");
     expect(email.text).toContain("https://stats.test/reset-password?token=abc");
+  });
+});
+
+describe("buildInviteEmail", () => {
+  it("informa quem convidou, o papel, a validade em horário de Brasília e o link", () => {
+    const email = buildInviteEmail({
+      acceptUrl: "https://stats.test/accept-invite?token=abc",
+      role: "ADMIN",
+      expiresAt: new Date("2026-10-11T15:00:00Z"),
+      inviterName: "Jeferson",
+    });
+
+    expect(email.subject).toBe("Convite para acessar o Stats A.P");
+    expect(email.text).toContain("Jeferson convidou você");
+    expect(email.text).toContain("Perfil de acesso: Administrador.");
+    expect(email.text).toMatch(/vale até 11\/10\/2026,? 12:00/);
+    expect(email.text).toContain("https://stats.test/accept-invite?token=abc");
   });
 });
