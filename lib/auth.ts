@@ -1,26 +1,33 @@
-import { SignJWT, jwtVerify } from "jose";
+import "server-only";
+
+import type { RowDataPacket } from "mysql2/promise";
 import { NextResponse } from "next/server";
+import {
+  AUTH_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  getJwtExpiresDays,
+  verifyAuthToken,
+  type JwtPayload,
+  type UserRole,
+} from "@lib/jwt";
+import { dbQueryOne } from "@lib/mysql";
 import {
   getCookieValue,
   isUnsafeMethod,
   requireCsrfToken,
   requireTrustedOrigin as requestRequiresTrustedOrigin,
 } from "@lib/requestSecurity";
+import { normalizeRole } from "@lib/roles";
+import { getUserAccountStatus } from "@lib/userStatus";
 
-const issuer = "etherium";
-const audience = "etherium-users";
-
-export const AUTH_COOKIE_NAME = "auth";
-export const CSRF_COOKIE_NAME = "csrf";
-
-export type UserRole = "SUPERADMIN" | "ADMIN" | "USER";
-
-export type JwtPayload = {
-  sub: string;
-  email: string;
-  name: string;
-  role: UserRole;
-};
+export {
+  AUTH_COOKIE_NAME,
+  CSRF_COOKIE_NAME,
+  getJwtExpiresDays,
+  signAuthToken,
+  verifyAuthToken,
+} from "@lib/jwt";
+export type { JwtPayload, UserRole } from "@lib/jwt";
 
 type CookieStoreLike = {
   set: (options: {
@@ -35,23 +42,14 @@ type CookieStoreLike = {
   }) => unknown;
 };
 
-function getRequiredEnv(name: string, minLength = 1) {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`Missing required environment variable: ${name}`);
-  if (value.length < minLength) {
-    throw new Error(`Environment variable ${name} must be at least ${minLength} characters long.`);
-  }
-  return value;
-}
-
-function getSecret() {
-  return new TextEncoder().encode(getRequiredEnv("JWT_SECRET", 32));
-}
-
-export function getJwtExpiresDays() {
-  const raw = Number(process.env.JWT_EXPIRES_DAYS ?? 7);
-  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 7;
-}
+type SessionUserRow = RowDataPacket & {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  isBlocked: number | boolean;
+  suspendedUntil: Date | string | null;
+};
 
 export function shouldUseSecureCookies() {
   if (process.env.NODE_ENV === "production") return true;
@@ -61,21 +59,6 @@ export function shouldUseSecureCookies() {
 
 export function isAdminRole(role: UserRole | null | undefined) {
   return role === "ADMIN" || role === "SUPERADMIN";
-}
-
-export async function signAuthToken(payload: JwtPayload) {
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setIssuer(issuer)
-    .setAudience(audience)
-    .setExpirationTime(`${getJwtExpiresDays()}d`)
-    .sign(getSecret());
-}
-
-export async function verifyAuthToken(token: string) {
-  const { payload } = await jwtVerify(token, getSecret(), { issuer, audience });
-  return payload as unknown as JwtPayload;
 }
 
 function buildBaseCookieOptions(maxAge: number) {
@@ -161,6 +144,14 @@ function deny(status: number, error: string) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+// Sessão revogada (usuário excluído, bloqueado ou suspenso): apaga os cookies para o
+// middleware não devolver o usuário de /login para / em laço.
+function revokedSessionResponse() {
+  const response = deny(401, "SESSION_REVOKED");
+  clearAuthCookies(response.cookies);
+  return response;
+}
+
 function constantTimeEqual(a: string, b: string) {
   const encoder = new TextEncoder();
   const left = encoder.encode(a);
@@ -176,6 +167,25 @@ function constantTimeEqual(a: string, b: string) {
   return diff === 0;
 }
 
+export async function loadSessionUser(userId: string): Promise<JwtPayload | null> {
+  const id = Number(userId);
+  if (!Number.isInteger(id) || id <= 0) return null;
+
+  const row = await dbQueryOne<SessionUserRow>(
+    "SELECT `id`, `name`, `email`, `role`, `isBlocked`, `suspendedUntil` FROM `User` WHERE `id` = ? LIMIT 1",
+    [id]
+  );
+  if (!row) return null;
+  if (getUserAccountStatus(row).status !== "ACTIVE") return null;
+
+  return {
+    sub: String(row.id),
+    email: row.email,
+    name: row.name ?? "",
+    role: normalizeRole(row.role),
+  };
+}
+
 export async function requireRequestAuth(req: Request, roles?: UserRole[]) {
   const { token, source } = getAuthTokenRecordFromRequest(req);
   if (!token) return { response: deny(401, "UNAUTHORIZED") };
@@ -185,15 +195,20 @@ export async function requireRequestAuth(req: Request, roles?: UserRole[]) {
     if (csrfError) return { response: csrfError };
   }
 
+  let tokenUser: JwtPayload;
   try {
-    const user = await verifyAuthToken(token);
-    if (roles?.length && !roles.includes(user.role)) {
-      return { response: deny(403, "FORBIDDEN") };
-    }
-    return { user };
+    tokenUser = await verifyAuthToken(token);
   } catch {
     return { response: deny(401, "UNAUTHORIZED") };
   }
+
+  const user = await loadSessionUser(tokenUser.sub);
+  if (!user) return { response: revokedSessionResponse() };
+
+  if (roles?.length && !roles.includes(user.role)) {
+    return { response: deny(403, "FORBIDDEN") };
+  }
+  return { user };
 }
 
 export function hasInternalApiKey(req: Request) {

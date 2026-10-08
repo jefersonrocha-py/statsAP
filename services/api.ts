@@ -98,6 +98,26 @@ export function buildApiHeaders(headers?: HeadersInit, method = "GET") {
   return nextHeaders;
 }
 
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly payload: any;
+
+  constructor(message: string, status: number, code: string | null, payload: any) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.payload = payload;
+  }
+}
+
+function redirectToLogin() {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname.startsWith("/login")) return;
+  window.location.assign("/login");
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? "GET").toUpperCase();
   const res = await fetch(path, {
@@ -112,12 +132,21 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {}
 
   if (!res.ok) {
-    let msg = `HTTP ${res.status} ${res.statusText} for ${path}`;
+    let payload: any = null;
     try {
-      const json = JSON.parse(text);
-      if (json?.error) msg = `${msg} - ${json.error}`;
+      payload = text ? JSON.parse(text) : null;
     } catch {}
-    throw new Error(msg);
+    const code = typeof payload?.error === "string" ? payload.error : null;
+
+    // Sessão expirada ou revogada: a API já apagou os cookies; leva o usuário ao login.
+    if (res.status === 401) redirectToLogin();
+
+    throw new ApiError(
+      `HTTP ${res.status} ${res.statusText} for ${path}${code ? ` - ${code}` : ""}`,
+      res.status,
+      code,
+      payload
+    );
   }
 
   try {
