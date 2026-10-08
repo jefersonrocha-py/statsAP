@@ -9,6 +9,7 @@ import {
   faLocationDot,
   faMap,
   faShieldHalved,
+  faTriangleExclamation,
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import Image from "next/image";
@@ -236,13 +237,19 @@ function SidebarContent({
     { path: "/dashboard", href: { pathname: "/dashboard" }, icon: faChartPie, label: "Dashboard" },
     { path: "/clients", href: { pathname: "/clients" }, icon: faUsers, label: "Clientes" },
     {
+      path: "/incidents",
+      href: { pathname: "/incidents" },
+      icon: faTriangleExclamation,
+      label: "Ocorrências",
+    },
+    {
       path: "/filter-cluster",
       href: { pathname: "/filter-cluster" },
       icon: faFilter,
       label: "Filtros Cluster",
     },
     ...(canManage
-      ? [{ path: "/settings", href: { pathname: "/settings" }, icon: faGear, label: "Configuracoes" }]
+      ? [{ path: "/settings", href: { pathname: "/settings" }, icon: faGear, label: "Configurações" }]
       : []),
   ];
 
@@ -320,7 +327,7 @@ function SidebarContent({
           <>
             {open ? (
               <div className="mt-4 px-3 text-xs uppercase tracking-[0.22em] text-white/50">
-                Administracao
+                Administração
               </div>
             ) : (
               <div className="mt-3" />
