@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { PoolConnection } from "mysql2/promise";
+import { applyIncidentTransition } from "@lib/incidents";
 import { dbExecute } from "@lib/mysql";
 import type { PendingEmit } from "@lib/sse";
 
@@ -25,6 +26,8 @@ export async function recordStatusTransition(
     connection
   );
 
+  const incidentEmits = await applyIncidentTransition(connection, transition);
+
   return [
     {
       event: "status.changed",
@@ -37,5 +40,6 @@ export async function recordStatusTransition(
         at: transition.at.toISOString(),
       },
     },
+    ...incidentEmits,
   ];
 }

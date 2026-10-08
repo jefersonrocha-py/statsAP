@@ -84,3 +84,55 @@ CREATE TABLE IF NOT EXISTS `UserInvite` (
   CONSTRAINT `UserInvite_invitedById_fkey`
     FOREIGN KEY (`invitedById`) REFERENCES `User` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `SchemaMigration` (
+  `name` VARCHAR(100) NOT NULL,
+  `appliedAt` DATETIME NOT NULL,
+  PRIMARY KEY (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Incident` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `antennaId` INT NULL,
+  `antennaName` VARCHAR(80) NOT NULL,
+  `networkName` VARCHAR(255) NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+  `resolution` VARCHAR(20) NULL,
+  `wentDownAt` DATETIME NOT NULL,
+  `lastDownAt` DATETIME NOT NULL,
+  `recoveredAt` DATETIME NULL,
+  `downCount` INT NOT NULL DEFAULT 1,
+  `alertSentAt` DATETIME NULL,
+  `recoveryAlertSentAt` DATETIME NULL,
+  `resolvedAt` DATETIME NULL,
+  `resolvedById` INT NULL,
+  `resolvedByName` VARCHAR(100) NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `Incident_status_lastDownAt_idx` (`status`, `lastDownAt`),
+  KEY `Incident_antennaId_status_idx` (`antennaId`, `status`),
+  KEY `Incident_createdAt_idx` (`createdAt`),
+  CONSTRAINT `Incident_antennaId_fkey`
+    FOREIGN KEY (`antennaId`) REFERENCES `Antenna` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `Incident_resolvedById_fkey`
+    FOREIGN KEY (`resolvedById`) REFERENCES `User` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `IncidentEvent` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `incidentId` BIGINT NOT NULL,
+  `type` VARCHAR(30) NOT NULL,
+  `message` TEXT NULL,
+  `fromStatus` VARCHAR(20) NULL,
+  `toStatus` VARCHAR(20) NULL,
+  `actorUserId` INT NULL,
+  `actorName` VARCHAR(100) NULL,
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `IncidentEvent_incidentId_createdAt_idx` (`incidentId`, `createdAt`),
+  CONSTRAINT `IncidentEvent_incidentId_fkey`
+    FOREIGN KEY (`incidentId`) REFERENCES `Incident` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `IncidentEvent_actorUserId_fkey`
+    FOREIGN KEY (`actorUserId`) REFERENCES `User` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

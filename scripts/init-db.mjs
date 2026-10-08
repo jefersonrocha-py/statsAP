@@ -20,20 +20,61 @@ async function columnExists(connection, tableName, columnName) {
   return Array.isArray(rows) && rows.length > 0;
 }
 
-async function ensureUserTableMigrations(connection) {
-  const hasSuspendedUntil = await columnExists(connection, "User", "suspendedUntil");
-  if (!hasSuspendedUntil) {
-    await connection.query("ALTER TABLE `User` ADD COLUMN `suspendedUntil` DATETIME NULL AFTER `isBlocked`");
-    console.log("Added User.suspendedUntil column.");
-  }
+async function ensureColumn(connection, tableName, columnName, ddl) {
+  if (await columnExists(connection, tableName, columnName)) return;
+  await connection.query(ddl);
+  console.log(`Added ${tableName}.${columnName} column.`);
 }
+
+// Migrações de dados executadas uma única vez (registradas em SchemaMigration).
+// Cada comando também é idempotente, para o caso de o processo cair no meio.
+async function runOnce(connection, name, statements) {
+  const [rows] = await connection.execute("SELECT 1 FROM `SchemaMigration` WHERE `name` = ? LIMIT 1", [name]);
+  if (Array.isArray(rows) && rows.length > 0) return;
+
+  for (const statement of statements) {
+    await connection.query(statement);
+  }
+  await connection.execute("INSERT INTO `SchemaMigration` (`name`, `appliedAt`) VALUES (?, UTC_TIMESTAMP())", [name]);
+  console.log(`Migration applied: ${name}`);
+}
+
+// APs que já estavam offline na implantação ganham ocorrência, sem disparar e-mail.
+const INCIDENT_BACKFILL_V1 = [
+  `INSERT INTO \`Incident\` (\`antennaId\`, \`antennaName\`, \`networkName\`, \`status\`, \`wentDownAt\`, \`lastDownAt\`, \`alertSentAt\`, \`createdAt\`, \`updatedAt\`)
+   SELECT a.\`id\`, LEFT(a.\`name\`, 80), a.\`networkName\`, 'OPEN',
+          COALESCE(a.\`lastStatusChange\`, UTC_TIMESTAMP()), COALESCE(a.\`lastStatusChange\`, UTC_TIMESTAMP()),
+          UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP()
+   FROM \`Antenna\` a
+   WHERE a.\`gdmsApId\` IS NOT NULL
+     AND a.\`status\` = 'DOWN'
+     AND NOT EXISTS (
+       SELECT 1 FROM \`Incident\` i WHERE i.\`antennaId\` = a.\`id\` AND i.\`status\` <> 'RESOLVED'
+     )`,
+  `INSERT INTO \`IncidentEvent\` (\`incidentId\`, \`type\`, \`message\`, \`toStatus\`, \`createdAt\`)
+   SELECT i.\`id\`, 'OPENED', 'Ocorrência criada na implantação (o AP já estava offline).', 'OPEN', UTC_TIMESTAMP()
+   FROM \`Incident\` i
+   WHERE NOT EXISTS (SELECT 1 FROM \`IncidentEvent\` e WHERE e.\`incidentId\` = i.\`id\`)`,
+];
 
 (async () => {
   const connection = await createMysqlConnection({ multipleStatements: true });
   try {
     const sql = await fs.readFile(schemaPath, "utf8");
     await connection.query(sql);
-    await ensureUserTableMigrations(connection);
+    await ensureColumn(
+      connection,
+      "User",
+      "suspendedUntil",
+      "ALTER TABLE `User` ADD COLUMN `suspendedUntil` DATETIME NULL AFTER `isBlocked`"
+    );
+    await ensureColumn(
+      connection,
+      "User",
+      "notificationsSeenAt",
+      "ALTER TABLE `User` ADD COLUMN `notificationsSeenAt` DATETIME NULL"
+    );
+    await runOnce(connection, "incident_backfill_v1", INCIDENT_BACKFILL_V1);
     console.log("Database schema is ready.");
   } catch (error) {
     console.error("Database initialization failed:", error);
