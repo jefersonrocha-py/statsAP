@@ -5,6 +5,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { NextResponse } from "next/server";
 import { requireTrustedOrigin } from "@lib/auth";
 import { sendMail } from "@lib/email";
+import { buildPasswordResetEmail } from "@lib/emailTemplates";
 import { dbExecute, dbQueryOne } from "@lib/mysql";
 import { buildPasswordResetUrl, createPasswordResetToken, getPasswordResetTokenTtlMinutes } from "@lib/passwordReset";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@lib/rateLimit";
@@ -73,25 +74,13 @@ export async function POST(req: Request) {
       );
 
       try {
-        const ttlMinutes = getPasswordResetTokenTtlMinutes();
         await sendMail({
-          html: [
-            `<p>Ola ${user.name || "usuario"},</p>`,
-            "<p>Recebemos uma solicitacao para redefinir a sua senha.</p>",
-            `<p><a href="${resetUrl}">Clique aqui para criar uma nova senha</a></p>`,
-            `<p>Este link expira em ${ttlMinutes} minutos. Se voce nao solicitou a alteracao, ignore este email.</p>`,
-          ].join(""),
-          subject: "Redefinicao de senha",
-          text: [
-            `Ola ${user.name || "usuario"},`,
-            "",
-            "Recebemos uma solicitacao para redefinir a sua senha.",
-            `Abra o link abaixo para criar uma nova senha: ${resetUrl}`,
-            "",
-            `Este link expira em ${ttlMinutes} minutos.`,
-            "Se voce nao solicitou a alteracao, ignore este email.",
-          ].join("\n"),
           to: user.email,
+          ...buildPasswordResetEmail({
+            name: user.name,
+            resetUrl,
+            ttlMinutes: getPasswordResetTokenTtlMinutes(),
+          }),
         });
       } catch (emailError) {
         console.error("POST /api/auth/forgot-password sendMail error:", emailError);

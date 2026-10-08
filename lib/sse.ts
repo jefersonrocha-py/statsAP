@@ -4,12 +4,14 @@ type Client = {
   closed: boolean;
 };
 
-let clientId = 0;
-const clients = new Map<number, Client>();
+// Registro global: todas as rotas do processo (sync, PATCH, /api/events) enxergam os mesmos clientes.
+type SseGlobal = typeof globalThis & { __sseClients?: Map<number, Client>; __sseClientSeq?: number };
+const sseGlobal = globalThis as SseGlobal;
+const clients = (sseGlobal.__sseClients ??= new Map<number, Client>());
 const encoder = new TextEncoder();
 
 export function addClient(controller: ReadableStreamDefaultController) {
-  const id = ++clientId;
+  const id = (sseGlobal.__sseClientSeq = (sseGlobal.__sseClientSeq ?? 0) + 1);
   const client: Client = { id, controller, closed: false };
   clients.set(id, client);
 

@@ -631,6 +631,7 @@ Use [`env.example`](./env.example) como baseline. Abaixo estao as chaves que rea
 | `SUPERADMIN_NAME` | Nao | `Root` | Nome exibido na conta inicial |
 | `SEED_SUPERADMIN_ON_STARTUP` | Nao | `false` | Em producao, mantenha `false`; habilite apenas para bootstrap controlado |
 | `SUPERADMIN_PROMOTE_IF_EXISTS` | Nao | `false` | Promove um usuario existente para `SUPERADMIN` somente quando a elevacao automatica for intencional |
+| `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS` | Não | `false` | Com `true`, a senha do superadmin é sobrescrita pela do `.env` a cada restart (desfaz redefinições). Mantenha `false` em produção |
 
 ### Proxy e origem confiavel
 
@@ -641,6 +642,8 @@ Essas variaveis sao aceitas pelo codigo para origem publica e fallback do fronte
 | `APP_URL` | Reverse proxy, dominio publico, HTTPS terminado fora do container | Ajuda a validacao de origem em mutacoes e serve de base publica para links de reset |
 | `NEXT_PUBLIC_APP_URL` | Mesmo cenario acima | Fallback para a mesma validacao, consumo frontend e build da imagem Docker |
 | `TRUST_PROXY_HEADERS` | Quando houver Nginx/Traefik/ALB confiavel na frente da app | Permite confiar em `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Forwarded-For` e `X-Real-IP` |
+
+Sem `TRUST_PROXY_HEADERS=true`, todos os acessos que chegam pelo proxy compartilham o mesmo IP ("unknown") nos limites por IP (login, recuperação de senha, convite). Atrás de um proxy confiável, habilite a variável.
 
 ### Observacoes importantes
 
