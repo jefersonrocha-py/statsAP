@@ -17,20 +17,16 @@ if (!email || !password) {
 
   try {
     const [rows] = await connection.execute(
-      "SELECT `id`, `name`, `role` FROM `User` WHERE `email` = ? LIMIT 1",
+      "SELECT `id`, `role` FROM `User` WHERE `email` = ? LIMIT 1",
       [email]
     );
     const exists = rows[0];
     const passwordHash = await bcrypt.hash(password, 12);
 
     if (exists?.id) {
+      // O nome só vale na criação: depois disso, quem manda é o que o usuário salvou em Minha Conta.
       const assignments = [];
       const values = [];
-
-      if (exists.name !== name) {
-        assignments.push("`name` = ?");
-        values.push(name);
-      }
 
       if (exists.role !== "SUPERADMIN") {
         if (promoteIfExists) {
