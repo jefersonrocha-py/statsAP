@@ -30,6 +30,20 @@ export function bearingFromDrag(startBearing: number, startAngle: number, curren
   return toSignedBearing(startBearing - shortestDelta(startAngle, currentAngle));
 }
 
+export type PendingRotation = { target: number; expiresAt: number };
+
+// Toques seguidos somam ao destino do giro em andamento, e não ao ângulo em que o mapa está no meio
+// da animação: dois toques de 15° dão 30°, mesmo que o segundo chegue antes de o primeiro terminar.
+export function stepRotationTarget(
+  currentBearing: number,
+  pending: PendingRotation | null,
+  delta: number,
+  now: number
+): number {
+  const base = pending && now < pending.expiresAt ? pending.target : currentBearing;
+  return base + delta;
+}
+
 export function bearingLabel(value: number): string {
   return LABELS[Math.round(normalizeBearing(value) / 45) % LABELS.length];
 }

@@ -5,6 +5,7 @@ import {
   normalizeBearing,
   pointerAngle,
   shortestDelta,
+  stepRotationTarget,
   toSignedBearing,
 } from "@lib/mapRotation";
 
@@ -60,5 +61,20 @@ describe("bearingLabel", () => {
     expect(bearingLabel(135)).toBe("SE");
     expect(bearingLabel(225)).toBe("SO");
     expect(bearingLabel(359)).toBe("N");
+  });
+});
+
+describe("stepRotationTarget", () => {
+  it("parte do bearing atual quando não há giro em andamento", () => {
+    expect(stepRotationTarget(10, null, -15, 1_000)).toBe(-5);
+  });
+
+  it("soma ao destino pendente enquanto a animação anterior não terminou", () => {
+    // O mapa ainda está em -7° a caminho de -15°: o segundo toque precisa chegar a -30°, não a -22°.
+    expect(stepRotationTarget(-7, { target: -15, expiresAt: 1_250 }, -15, 1_100)).toBe(-30);
+  });
+
+  it("ignora o destino pendente depois que a animação terminou", () => {
+    expect(stepRotationTarget(40, { target: -15, expiresAt: 1_250 }, -15, 1_300)).toBe(25);
   });
 });

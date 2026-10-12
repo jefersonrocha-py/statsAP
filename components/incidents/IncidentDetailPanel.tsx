@@ -125,7 +125,7 @@ export default function IncidentDetailPanel({ incidentId, canManage, onClose, on
         role="dialog"
         aria-modal="true"
         aria-label="Detalhes da ocorrência"
-        className="surface-overlay flex h-full w-full max-w-xl flex-col overflow-hidden backdrop-blur-md"
+        className="surface-popover flex h-full w-full max-w-xl flex-col overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-black/10 p-4 dark:border-white/10">

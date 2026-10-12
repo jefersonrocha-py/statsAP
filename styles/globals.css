@@ -20,6 +20,8 @@
   --surface-soft-hover: rgba(15, 23, 42, 0.085);
   --surface-overlay: rgba(255, 255, 255, 0.56);
   --surface-overlay-border: rgba(255, 255, 255, 0.28);
+  --surface-popover: rgba(255, 255, 255, 0.97);
+  --surface-popover-border: rgba(15, 23, 42, 0.12);
   --surface-button: rgba(255, 255, 255, 0.9);
   --surface-button-hover: rgba(255, 255, 255, 0.98);
   --surface-button-text: #0b1220;
@@ -42,6 +44,8 @@ html.dark {
   --surface-soft-hover: rgba(255, 255, 255, 0.14);
   --surface-overlay: rgba(2, 6, 23, 0.52);
   --surface-overlay-border: rgba(255, 255, 255, 0.14);
+  --surface-popover: rgba(10, 16, 30, 0.97);
+  --surface-popover-border: rgba(255, 255, 255, 0.14);
   --surface-button: rgba(15, 23, 42, 0.84);
   --surface-button-hover: rgba(15, 23, 42, 0.94);
   --surface-button-text: #f8fafc;
@@ -93,6 +97,14 @@ body {
 .surface-overlay {
   background-color: var(--surface-overlay);
   border: 1px solid var(--surface-overlay-border);
+  box-shadow: var(--elevated-shadow);
+}
+
+/* Painéis e menus com texto: quase opacos. Dentro de um elemento com backdrop-filter o desfoque
+   do filho não alcança a página, então a legibilidade não pode depender dele. */
+.surface-popover {
+  background-color: var(--surface-popover);
+  border: 1px solid var(--surface-popover-border);
   box-shadow: var(--elevated-shadow);
 }
 

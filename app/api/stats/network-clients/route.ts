@@ -9,6 +9,9 @@ import { createCachedLoader } from "@lib/ttlCache";
 import { listConnectedClientsByNetwork, type NetworkClientStat } from "@services/gdms";
 
 const CACHE_TTL_MS = 60_000;
+// A consulta completa ao GWN leva vários segundos; dentro deste limite a tela recebe o último valor
+// na hora e a atualização roda em segundo plano.
+const CACHE_MAX_STALE_MS = 10 * 60_000;
 
 type NetworkClientsLoader = () => Promise<{ value: NetworkClientStat[]; cachedAt: number }>;
 type CacheGlobal = typeof globalThis & { __networkClientsLoader?: NetworkClientsLoader };
@@ -16,7 +19,7 @@ type CacheGlobal = typeof globalThis & { __networkClientsLoader?: NetworkClients
 function getLoader(): NetworkClientsLoader {
   const store = globalThis as CacheGlobal;
   if (!store.__networkClientsLoader) {
-    store.__networkClientsLoader = createCachedLoader(listConnectedClientsByNetwork, CACHE_TTL_MS);
+    store.__networkClientsLoader = createCachedLoader(listConnectedClientsByNetwork, CACHE_TTL_MS, Date.now, CACHE_MAX_STALE_MS);
   }
   return store.__networkClientsLoader;
 }

@@ -279,10 +279,10 @@ function DashboardCardsInner({
   const showConnectedClientsCard = connectedClients !== undefined;
   const clientSub =
     connectedClients === null
-      ? "Atualizando leitura do GDMS"
+      ? "Consultando o GWN…"
       : clientNetworks && clientNetworks > 0
       ? `${fmtInt(clientNetworks)} ${clientNetworks === 1 ? "rede" : "redes"}`
-      : "Visão geral do GDMS";
+      : "Clientes ativos no GWN";
 
   return (
     <div className={cx("space-y-3", className)}>

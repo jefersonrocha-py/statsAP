@@ -285,7 +285,8 @@ export default function AdminPage() {
           </button>
         </form>
         <p className="text-xs opacity-70">
-          {selectedRole?.description}. O convidado recebe um link por e-mail, válido por tempo limitado e de uso único,
+          {selectedRole ? `Perfil ${selectedRole.label}: ${selectedRole.description.charAt(0).toLowerCase()}${selectedRole.description.slice(1)}. ` : ""}
+          O convidado recebe um link por e-mail, válido por tempo limitado e de uso único,
           para definir nome e senha.
         </p>
       </section>

@@ -182,7 +182,8 @@ export default function MapClient() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "UP" | "DOWN">("ALL");
   const [netFilter, setNetFilter] = useState<string>("");
-  const [panelOpen, setPanelOpen] = useState(true);
+  // No celular o painel cobre quase todo o mapa: começa fechado. (Componente só roda no navegador.)
+  const [panelOpen, setPanelOpen] = useState(() => !window.matchMedia("(max-width: 767px)").matches);
   const [openModal, setOpenModal] = useState(false);
   const [name, setName] = useState("");
   const [lat, setLat] = useState<string>("");
@@ -572,19 +573,22 @@ export default function MapClient() {
           onClick={() => setPanelOpen((value) => !value)}
           className="surface-button pointer-events-auto inline-flex h-10 items-center gap-2 rounded-xl px-3"
           title={panelOpen ? "Fechar painel" : "Abrir painel"}
+          aria-label={panelOpen ? "Fechar painel" : "Abrir painel"}
+          aria-expanded={panelOpen}
         >
           <FontAwesomeIcon icon={faXmark} className={`h-4 w-4 ${panelOpen ? "" : "hidden"}`} />
           <FontAwesomeIcon icon={faBars} className={`h-4 w-4 ${panelOpen ? "hidden" : ""}`} />
-          <span className="text-sm">{panelOpen ? "Fechar" : "Painel"}</span>
+          <span className="hidden text-sm sm:inline">{panelOpen ? "Fechar" : "Painel"}</span>
         </button>
 
         <button
           onClick={() => fitCity()}
           className="surface-button pointer-events-auto inline-flex h-10 items-center gap-2 rounded-xl px-3"
           title="Enquadrar cidade"
+          aria-label="Enquadrar cidade"
         >
           <FontAwesomeIcon icon={faLocationCrosshairs} className="h-4 w-4" />
-          <span className="text-sm">Cidade</span>
+          <span className="hidden text-sm sm:inline">Cidade</span>
         </button>
 
         <button
@@ -592,15 +596,16 @@ export default function MapClient() {
           disabled={filtered.length === 0}
           className="surface-button pointer-events-auto inline-flex h-10 items-center gap-2 rounded-xl px-3 disabled:opacity-50"
           title="Enquadrar pinos filtrados"
+          aria-label="Enquadrar pinos filtrados"
         >
           <FontAwesomeIcon icon={faLocationCrosshairs} className="h-4 w-4" />
-          <span className="text-sm">Pinos</span>
+          <span className="hidden text-sm sm:inline">Pinos</span>
         </button>
 
         <select
           value={basemap}
           onChange={(event) => setBasemap(event.target.value as BasemapKey)}
-          className="surface-button pointer-events-auto h-10 rounded-xl px-2 text-sm"
+          className="surface-button pointer-events-auto h-10 rounded-xl py-0 pl-3 pr-8 text-sm"
           title="Mapa base"
           aria-label="Selecionar mapa base"
         >
@@ -610,7 +615,7 @@ export default function MapClient() {
       </div>
 
       <div
-        className={`surface-overlay absolute right-4 top-16 z-[1004] max-h-[70vh] w-[320px] overflow-hidden rounded-2xl
+        className={`surface-overlay absolute right-4 top-16 z-[1004] max-h-[70vh] w-[320px] max-w-[calc(100%-2rem)] overflow-hidden rounded-2xl
           backdrop-blur-md transition-all
           ${panelOpen ? "pointer-events-auto translate-x-0 opacity-100" : "pointer-events-none translate-x-4 opacity-0"}`}
       >
@@ -755,7 +760,7 @@ export default function MapClient() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="surface-overlay w-full max-w-md rounded-2xl">
+          <div className="surface-popover w-full max-w-md rounded-2xl">
             <div className="flex items-center justify-between border-b border-black/10 px-5 py-4 dark:border-white/10">
               <h3 className="text-lg font-semibold">Nova antena</h3>
               <button

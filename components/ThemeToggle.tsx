@@ -71,7 +71,7 @@ export default function ThemeToggle() {
         <div
           ref={menuRef}
           role="menu"
-          className="surface-overlay absolute right-0 z-[500] mt-2 w-52 overflow-hidden rounded-xl"
+          className="surface-popover absolute right-0 z-[500] mt-2 w-52 overflow-hidden rounded-xl"
         >
           {OPTIONS.map((option) => (
             <button

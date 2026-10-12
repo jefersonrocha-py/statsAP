@@ -93,7 +93,7 @@ export default function NotificationBell() {
         <div
           role="dialog"
           aria-label="Notificações de ocorrências"
-          className="surface-overlay absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl p-3 backdrop-blur-md"
+          className="surface-popover absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl p-3"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>

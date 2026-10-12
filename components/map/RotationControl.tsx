@@ -11,11 +11,15 @@ import {
   pointerAngle,
   ROTATION_STEP_BUTTON,
   ROTATION_STEP_KEY,
+  stepRotationTarget,
+  type PendingRotation,
 } from "@lib/mapRotation";
 
 type Props = { map: MapLibreMap | null };
 
 type DragState = { pointerId: number; startAngle: number; startBearing: number };
+
+const ROTATE_DURATION_MS = 250;
 
 const ROSE_MARKS = [
   { label: "N", angle: 0, className: "text-rose-300" },
@@ -47,6 +51,7 @@ export default function RotationControl({ map }: Props) {
   const dragRef = useRef<DragState | null>(null);
   const frameRef = useRef<number | null>(null);
   const pendingBearingRef = useRef<number | null>(null);
+  const pendingRotationRef = useRef<PendingRotation | null>(null);
 
   // Só este componente re-renderiza durante a rotação, no máximo uma vez por quadro.
   useEffect(() => {
@@ -100,18 +105,23 @@ export default function RotationControl({ map }: Props) {
   const rotateBy = useCallback(
     (delta: number) => {
       if (!map) return;
-      map.easeTo({ bearing: map.getBearing() + delta, duration: 250 });
+      const now = performance.now();
+      const target = stepRotationTarget(map.getBearing(), pendingRotationRef.current, delta, now);
+      pendingRotationRef.current = { target, expiresAt: now + ROTATE_DURATION_MS };
+      map.easeTo({ bearing: target, duration: ROTATE_DURATION_MS });
     },
     [map]
   );
 
   const resetNorth = useCallback(() => {
+    pendingRotationRef.current = null;
     map?.easeTo({ bearing: 0, duration: 300 });
   }, [map]);
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (!map || event.button !== 0) return;
     event.preventDefault();
+    pendingRotationRef.current = null;
     map.stop();
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {

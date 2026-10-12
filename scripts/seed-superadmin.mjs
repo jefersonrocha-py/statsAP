@@ -8,7 +8,7 @@ const promoteIfExists = process.env.SUPERADMIN_PROMOTE_IF_EXISTS === "true";
 const syncPasswordIfExists = process.env.SUPERADMIN_SYNC_PASSWORD_IF_EXISTS === "true";
 
 if (!email || !password) {
-  console.log("SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD nao definidos. Seed ignorado.");
+  console.log("SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD não definidos. Seed ignorado.");
   process.exit(0);
 }
 
@@ -36,7 +36,7 @@ if (!email || !password) {
         if (promoteIfExists) {
           assignments.push("`role` = 'SUPERADMIN'");
         } else {
-          console.log("Usuario existente nao foi promovido automaticamente. Use SUPERADMIN_PROMOTE_IF_EXISTS=true se isso for intencional.");
+          console.log("Usuário existente não foi promovido automaticamente. Use SUPERADMIN_PROMOTE_IF_EXISTS=true se isso for intencional.");
         }
       }
 
@@ -57,9 +57,9 @@ if (!email || !password) {
       }
 
       if (exists.role !== "SUPERADMIN" && promoteIfExists) {
-        console.log("Usuario promovido para SUPERADMIN:", email);
+        console.log("Usuário promovido para SUPERADMIN:", email);
       } else {
-        console.log("Superadmin ja existe:", email);
+        console.log("Superadmin já existe:", email);
       }
     } else {
       await connection.execute(
