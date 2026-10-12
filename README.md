@@ -31,6 +31,7 @@
 - [Integração GWN/GDMS](#integração-gwngdms)
 - [Ocorrências e alertas](#ocorrências-e-alertas)
 - [Convite de usuários](#convite-de-usuários)
+- [Minha Conta](#minha-conta)
 - [Autenticação, sessão e papéis](#autenticação-sessão-e-papéis)
 - [Tempo real (SSE)](#tempo-real-sse)
 - [Telas](#telas)
@@ -60,6 +61,7 @@ O Stats A.P reúne em um só lugar o inventário, o status e o histórico dos ac
 - **Central de notificações** (sino na barra superior) e toasts em tempo real de AP offline/online.
 - **Configurações**: fila de APs que ainda não têm posição no GWN e botão "Sincronizar GDMS".
 - **Administração**: convite de usuários por e-mail, papéis `USER`/`ADMIN`/`SUPERADMIN`, bloqueio, suspensão e exclusão.
+- **Minha Conta**: cada usuário edita nome, cargo, telefone, e-mail de acesso, senha e foto de perfil.
 - **Worker** que sincroniza status e posição com o GWN a cada 5 minutos.
 
 ## Novidades da v1.2
@@ -71,6 +73,7 @@ Resumo; o detalhe está no [CHANGELOG](./CHANGELOG.md).
 - Ocorrências de AP offline com estados, ações, auditoria só de inserção, e-mail-resumo e central de notificações.
 - Convite de usuário por e-mail com link de uso único, no lugar do cadastro direto pelo administrador.
 - Sessão revalidada no banco a cada requisição: usuário excluído, bloqueado ou suspenso perde o acesso na hora.
+- Minha Conta: dados pessoais, troca de e-mail e de senha (que encerra as sessões em outros dispositivos) e foto de perfil guardada no MinIO.
 - Controle de rotação do mapa reescrito (bússola alinhada ao norte, arraste relativo, botões e teclado).
 - Sidebar retrátil com botão de seta na borda e preferência salva; gaveta própria no celular.
 - Identidade visual com símbolo e nome, versão exibida na sidebar e no rodapé.
@@ -88,9 +91,10 @@ Resumo; o detalhe está no [CHANGELOG](./CHANGELOG.md).
 | E-mail | `nodemailer` com SMTP autenticado | Redefinição de senha, convites e alertas de ocorrência |
 | Banco | MySQL 8.4 com `mysql2/promise` e SQL direto | Persistência sem ORM; schema em [`db/schema.sql`](./db/schema.sql) |
 | Integração | GWN/GDMS OpenAPI (OAuth client credentials + requisições assinadas) | Redes, APs, status, posição e clientes |
+| Armazenamento | MinIO (compatível com S3), cliente `minio` | Fotos de perfil, em bucket privado |
 | Tempo real | Server-Sent Events em `/api/events` | Atualização da interface, toasts e notificações |
 | Testes | Vitest 2 | Testes unitários em `tests/unit/` |
-| Infra | Docker multi-stage + Docker Compose | Serviços `mysql`, `web` e `worker` com healthchecks |
+| Infra | Docker multi-stage + Docker Compose | Serviços `mysql`, `minio`, `web` e `worker` com healthchecks |
 
 ## Arquitetura
 
@@ -109,6 +113,7 @@ flowchart LR
 
   subgraph Data["Persistência"]
     DB[("MySQL 8.4<br/>Antenna, StatusHistory, Incident, IncidentEvent,<br/>User, UserInvite, PasswordResetToken, gdms_token")]
+    S3[("MinIO<br/>fotos de perfil (bucket privado)")]
   end
 
   subgraph External["Serviços externos"]
@@ -125,6 +130,7 @@ flowchart LR
   CORE --> DB
   CORE --> GDMS
   CORE --> SMTP
+  CORE --> S3
   Worker -->|"POST interno (x-internal-api-key)"| API
   API -->|SSE| FE
 ```
@@ -132,6 +138,7 @@ flowchart LR
 Princípios:
 
 - O navegador nunca chama o GWN; toda comunicação externa sai do container `web`.
+- As fotos de perfil ficam em um bucket privado do MinIO e saem sempre pela aplicação (`/api/account/avatar`); o MinIO não tem porta publicada.
 - O `worker` não tem cliente GDMS próprio: ele chama a rota interna de sync, que aplica a mesma regra de negócio do botão da interface.
 - `middleware.ts` protege as páginas privadas e bloqueia por papel; as rotas `/api/*` se protegem com `requireRequestAuth(...)` ou `requireRequestAuthOrInternal(...)`.
 - O container `web` aplica o schema e as migrações no startup ([`scripts/docker-entrypoint.sh`](./scripts/docker-entrypoint.sh) → [`scripts/init-db.mjs`](./scripts/init-db.mjs)).
@@ -208,7 +215,7 @@ Regras:
 
 - A contagem por rede vem de `POST /oapi/v1.0.0/client/list` com `pageSize: 1`, usando `data.total` (uma linha por MAC conectado).
 - As contagens de APs online/offline por rede continuam vindo do `ap/list`.
-- O resultado fica em cache por 60 s, compartilhado entre usuários, com deduplicação da requisição em andamento; as redes são consultadas com concorrência 4.
+- O resultado fica em cache por 60 s, compartilhado entre usuários, com deduplicação da requisição em andamento; as redes são consultadas com concorrência 4. Depois de vencido, o último valor (com até 10 minutos) é devolvido na hora enquanto a atualização roda em segundo plano, para a tela não esperar a consulta completa ao GWN.
 - A resposta inclui `source: "client/list"` e `generatedAt`, exibido como "Atualizado em".
 
 ## Ocorrências e alertas
@@ -296,6 +303,25 @@ sequenceDiagram
 - A senha segue a política forte: no mínimo 12 caracteres, com letra minúscula, maiúscula, número e símbolo.
 - O link usa a URL pública da aplicação (`APP_URL` → `NEXT_PUBLIC_APP_URL` → host da requisição), definida em [`lib/publicUrl.ts`](./lib/publicUrl.ts).
 
+## Minha Conta
+
+Tela `/account`, disponível para todos os papéis. Abre pelo card "Bem-vindo" da sidebar (foto ou iniciais + nome) ou pelo item **Minha Conta** do menu.
+
+| Bloco | O que faz | Regras |
+| --- | --- | --- |
+| Foto de perfil | Enviar, trocar ou remover | PNG, JPEG ou WebP. O navegador recorta o centro e reduz para 256×256 (WebP) antes do envio; o servidor aceita até 512 KB e confere o tipo pelo conteúdo do arquivo (SVG é recusado) |
+| Dados pessoais | Nome, cargo e telefone | Nome de 2 a 80 caracteres; cargo até 100; telefone com 8 a 15 dígitos (DDD e DDI opcionais) |
+| E-mail de acesso | Troca o e-mail do login | Pede a senha atual; `409 EMAIL_TAKEN` se o e-mail já pertence a outra conta; o endereço antigo recebe um aviso |
+| Senha | Troca a senha | Pede a senha atual e segue a política forte; encerra as sessões abertas em outros dispositivos |
+
+- **Onde aparece:** a foto e o nome no card "Bem-vindo" da sidebar; cargo e telefone na lista de usuários da Administração.
+- **Armazenamento da foto:** bucket privado `MINIO_BUCKET` (padrão `statsap-avatars`) do serviço `minio` do compose, criado pela aplicação no primeiro uso. A chave é `avatars/<id do usuário>/<aleatório>.<ext>`, gerada no servidor; cada foto nova ganha uma chave nova e a anterior é apagada. Excluir um usuário apaga a foto dele.
+- **Entrega da foto:** sempre por `GET /api/account/avatar` (só a foto do próprio usuário), com `nosniff` e cache privado. O MinIO não tem porta publicada e a CSP não muda.
+- **Sessões e senha:** trocar a senha (aqui ou por "Esqueci a senha") grava `User.passwordChangedAt`; tokens emitidos antes desse momento recebem `401 SESSION_REVOKED`. A sessão que fez a troca recebe um cookie novo e continua ativa.
+- **Senha atual errada** responde `400 INVALID_PASSWORD` (e não `401`, que no cliente significa sessão encerrada).
+- **Limites:** 5 trocas de e-mail e 5 de senha a cada 15 minutos por usuário; 20 envios de foto por hora.
+- **MinIO fora do ar:** o envio de foto responde `503 STORAGE_UNAVAILABLE` e a sidebar mostra as iniciais; o resto da aplicação não é afetado, e o `web` sobe mesmo sem o MinIO.
+
 ## Autenticação, sessão e papéis
 
 ### Login e cookies
@@ -309,13 +335,14 @@ sequenceDiagram
 - O middleware (edge) só confere a assinatura do JWT ([`lib/jwt.ts`](./lib/jwt.ts)). As rotas de API ([`lib/auth.ts`](./lib/auth.ts)) consultam o usuário no banco a cada requisição.
 - Usuário excluído, bloqueado ou suspenso recebe `401 SESSION_REVOKED`, e essa resposta apaga os cookies para o navegador não ficar em laço entre `/login` e `/`.
 - O papel usado na autorização vem do banco, não do token: uma mudança de papel vale na próxima requisição.
+- Trocar ou redefinir a senha encerra as sessões abertas antes da troca (ver [Minha Conta](#minha-conta)).
 - No cliente, qualquer `401` leva o usuário para `/login`.
 
 ### Papéis
 
 | Papel | Acesso |
 | --- | --- |
-| `USER` | Mapa, Dashboard, Clientes, Ocorrências (leitura) e Filtros (leitura) |
+| `USER` | Mapa, Dashboard, Clientes, Ocorrências (leitura), Filtros (leitura) e Minha Conta |
 | `ADMIN` | Tudo do USER + ações em ocorrências, Configurações, sync GDMS, criação/edição de APs, alertas por e-mail |
 | `SUPERADMIN` | Tudo do ADMIN + Administração (usuários e convites) |
 
@@ -345,6 +372,7 @@ sequenceDiagram
 | Ocorrências | `/incidents` | Lista com filtros e painel com linha do tempo e ações | Autenticado (ações: ADMIN) |
 | Filtros Cluster | `/filter-cluster` | Busca, paginação, CSV, troca de status e exclusão | Autenticado (mutações: ADMIN) |
 | Configurações | `/settings` | APs sem posição no GWN e "Sincronizar GDMS" com resumo | ADMIN |
+| Minha Conta | `/account` | Foto, dados pessoais, e-mail de acesso e senha do próprio usuário | Autenticado |
 | Administração | `/admin` | Usuários, convites, bloqueio, suspensão e exclusão | SUPERADMIN |
 
 ## Interface
@@ -354,11 +382,13 @@ sequenceDiagram
 - No desktop, o botão de seta na borda da sidebar recolhe para uma faixa de ícones (`w-20`) e expande de volta (`w-72`). A escolha fica salva no navegador (`localStorage`, chave `sidebarCollapsed`) e é restaurada na próxima visita ([`lib/sidebarPreference.ts`](./lib/sidebarPreference.ts), [`store/ui.ts`](./store/ui.ts)).
 - No celular, a sidebar vira uma gaveta sobreposta: abre pelo botão ☰ da barra superior e fecha pelo X, pelo fundo escurecido, pela tecla Esc ou ao trocar de página.
 - Os botões têm `aria-label`, `aria-expanded` e `aria-controls`.
+- O card "Bem-vindo" mostra a foto de perfil (ou as iniciais) e leva para Minha Conta ([`components/UserAvatar.tsx`](./components/UserAvatar.tsx), [`store/profile.ts`](./store/profile.ts)).
 
 ### Identidade e versão
 
 - [`components/BrandMark.tsx`](./components/BrandMark.tsx) mostra o símbolo da Etheriumtech com o nome "Stats A.P"; com a sidebar recolhida, só o símbolo.
 - A versão exibida na sidebar e no rodapé vem do `package.json` (ver [Versionamento](#versionamento)).
+- O ícone da aba é [`app/icon.png`](./app/icon.png), gerado a partir do símbolo.
 - O rodapé traz contato, canais e o bloco "Powered by":
 
 | Nome | Papel | LinkedIn |
@@ -378,7 +408,7 @@ sequenceDiagram
 - o "N" do anel aponta sempre para o norte real do mapa;
 - arraste relativo, sem salto ao tocar: o mapa gira no mesmo sentido do dedo ou do mouse;
 - botões "Norte", "Girar 45° à esquerda" e "Girar 45° à direita";
-- teclado: setas giram 15° e `Home` volta ao norte;
+- teclado: setas giram 15° e `Home` volta ao norte; toques seguidos se somam (duas setas giram 30°);
 - "Cidade" e "Pinos" preservam a rotação ao enquadrar o mapa.
 
 ## Modelo de dados
@@ -439,6 +469,10 @@ erDiagram
     boolean isBlocked
     datetime suspendedUntil
     datetime notificationsSeenAt
+    string phone
+    string jobTitle
+    string avatarKey
+    datetime passwordChangedAt
   }
   UserInvite {
     bigint id PK
@@ -477,6 +511,7 @@ erDiagram
 
 - `Incident.antennaId`, `resolvedById`, `IncidentEvent.actorUserId` e `UserInvite.invitedById` usam `ON DELETE SET NULL`: excluir um AP ou um usuário não apaga o histórico.
 - `SchemaMigration` registra as migrações de execução única (por exemplo, `incident_backfill_v1`).
+- `User.avatarKey` guarda só a chave do objeto no MinIO; a imagem não fica no banco. `User.passwordChangedAt` é o corte das sessões na troca de senha.
 - Todas as mudanças da v1.2 são aditivas (`CREATE TABLE IF NOT EXISTS` e colunas novas verificadas antes do `ALTER`) e aplicadas por `scripts/init-db.mjs`.
 
 ## Estrutura do repositório
@@ -499,11 +534,13 @@ Omitidos: `.git/`, `.next/` e `node_modules/`.
 |-- tailwind.config.ts
 |-- vitest.config.ts
 |-- app
+|   |-- icon.png
 |   |-- layout.tsx
 |   |-- loading.tsx
 |   |-- (app)
 |   |   |-- layout.tsx
 |   |   |-- page.tsx                      # Mapa
+|   |   |-- account/page.tsx
 |   |   |-- admin/page.tsx
 |   |   |-- clients/page.tsx
 |   |   |-- dashboard/{loading,page}.tsx
@@ -517,6 +554,7 @@ Omitidos: `.git/`, `.next/` e `node_modules/`.
 |   |   |-- login/page.tsx
 |   |   `-- reset-password/page.tsx
 |   `-- api
+|       |-- account/{route.ts, avatar/route.ts, email/route.ts, password/route.ts}
 |       |-- antennas/{route.ts, networks/, [id]/route.ts, [id]/coords/}
 |       |-- auth/{login, logout, register, forgot-password, reset-password, invite, accept-invite}/
 |       |-- events/route.ts
@@ -541,12 +579,15 @@ Omitidos: `.git/`, `.next/` e `node_modules/`.
 |   |-- NotificationBell.tsx
 |   |-- PaginationControls.tsx
 |   |-- ThemeScript.tsx / ThemeSync.tsx / ThemeToggle.tsx
+|   |-- UserAvatar.tsx
 |   |-- incidents/IncidentDetailPanel.tsx
 |   `-- map/RotationControl.tsx
 |-- db/schema.sql
 |-- docs/superpowers/{specs,plans}/      # Desenho e plano da v1.2
 |-- lib
-|   |-- auth.ts / jwt.ts / roles.ts / requestSecurity.ts / rateLimit.ts
+|   |-- auth.ts / jwt.ts / roles.ts / sessionRules.ts / requestSecurity.ts / rateLimit.ts
+|   |-- account.ts / accountValidators.ts / accountMessages.ts
+|   |-- avatarKey.ts / avatarCrop.ts / avatarImage.ts / imageType.ts / storage.ts / storageConfig.ts
 |   |-- gdmsToken.ts / gdmsNormalize.ts / gdmsSyncPlan.ts / gdmsSync.ts
 |   |-- statusChanges.ts / incidentRules.ts / incidents.ts / incidentAlerts.ts / incidentFormat.ts
 |   |-- invites.ts / inviteToken.ts / passwordReset.ts / publicUrl.ts
@@ -562,7 +603,7 @@ Omitidos: `.git/`, `.next/` e `node_modules/`.
 |   |-- init-db.mjs / mysql-utils.mjs
 |   `-- seed-local.mjs / seed-superadmin.mjs
 |-- services/{api.ts, gdms.ts, sseClient.ts}
-|-- store/{theme.ts, ui.ts}
+|-- store/{profile.ts, theme.ts, ui.ts}
 |-- styles/globals.css
 `-- tests
     |-- stubs/server-only.ts
@@ -642,6 +683,16 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 | `INCIDENT_ALERTS_ENABLED` | Não | `true` | Liga o e-mail-resumo de APs offline/normalizados |
 | `INCIDENT_ALERT_MIN_MINUTES` | Não | `10` | Tempo offline mínimo antes do alerta (1 a 1440 min); evita alarme por queda rápida |
 
+### Fotos de perfil (MinIO)
+
+| Variável | Obrigatória | Exemplo | Observação |
+| --- | --- | --- | --- |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Sim no Compose | `statsap` / … | Credenciais do serviço `minio`; senha com 8+ caracteres. O `docker compose` recusa subir sem elas |
+| `MINIO_IMAGE` | Não | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` | Imagem do serviço. O repositório oficial `minio/minio` saiu do Docker Hub; o padrão é o fork comunitário `pgsty/minio`, com a versão fixada |
+| `MINIO_ENDPOINT` | Não no Compose | `http://minio:9000` | Endereço do MinIO visto pelo `web`. Sem ele (fora do Compose), o envio de foto fica desligado |
+| `MINIO_BUCKET` | Não | `statsap-avatars` | Bucket privado, criado no primeiro uso |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | Não | … | Credenciais próprias do app. Sem elas, o app usa `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` |
+
 ### Superadmin inicial
 
 | Variável | Obrigatória | Exemplo | Observação |
@@ -690,12 +741,14 @@ Abra `http://localhost:3200` (ou o `HOST_PORT` definido). Para testar localmente
 | Serviço | Função | Healthcheck | Porta |
 | --- | --- | --- | --- |
 | `mysql` | MySQL 8.4 com volume `mysql_data` | `mysqladmin ping` | Só interna (`mysql:3306`) |
+| `minio` | Fotos de perfil, com volume `minio_data` | `GET /minio/health/live` em `minio` | Só interna (`minio:9000`) |
 | `web` | Interface, APIs, SSE, schema e seed no startup | `GET /api/health` em `web` | `${HOST_PORT}:${PORT}` |
 | `worker` | Sync periódico com o GWN | Aguarda o `web` saudável | — |
 
 - `web` e `worker` leem `./.env` via `env_file` e rodam com `no-new-privileges` e `cap_drop: [ALL]`.
 - O `web` usa o `server.js` de `.next/standalone` (`output: "standalone"`).
-- O `web` participa da rede externa `web` (proxy reverso); `mysql` e `worker` ficam só na rede interna `app_net`.
+- O `web` participa da rede externa `web` (proxy reverso); `mysql`, `minio` e `worker` ficam só na rede interna `app_net`.
+- O `web` não depende do `minio` para subir: sem ele, só o envio de foto fica indisponível.
 - Os healthchecks usam os nomes de serviço (`mysql`, `web`), nunca `localhost`.
 
 ### Antes do primeiro `up` em produção
@@ -708,7 +761,8 @@ Abra `http://localhost:3200` (ou o `HOST_PORT` definido). Para testar localmente
 - [ ] `SEED_SUPERADMIN_ON_STARTUP=false` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS=false` depois do primeiro bootstrap.
 - [ ] SMTP preenchido (convites, redefinição e alertas) e destinatários ADMIN/SUPERADMIN com e-mail válido.
 - [ ] Credenciais GDMS preenchidas.
-- [ ] Backup do volume `mysql_data`.
+- [ ] `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD` definidos (senha com 8+ caracteres).
+- [ ] Backup dos volumes `mysql_data` e `minio_data`.
 
 ### Startup do `web`
 
@@ -719,14 +773,16 @@ Abra `http://localhost:3200` (ou o `HOST_PORT` definido). Para testar localmente
 
 ### Atualizar para a v1.2
 
+Antes, acrescente ao `.env` as credenciais do MinIO (`MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD`); sem elas o `docker compose` para com a mensagem "defina MINIO_ROOT_USER no .env".
+
 ```bash
 git pull
-docker compose up -d --build web worker
+docker compose up -d --build
 ```
 
 - O schema é atualizado sozinho no startup. Na primeira subida, as ocorrências dos APs que já estavam offline são criadas sem disparar e-mail.
 - O primeiro sync aplica a posição do GWN a todos os APs que têm localização configurada lá; a fila de Configurações passa a listar só os que não têm.
-- Variáveis novas, todas com padrão: `INVITE_TOKEN_HOURS`, `INCIDENT_ALERTS_ENABLED`, `INCIDENT_ALERT_MIN_MINUTES`.
+- Variáveis novas com padrão: `INVITE_TOKEN_HOURS`, `INCIDENT_ALERTS_ENABLED`, `INCIDENT_ALERT_MIN_MINUTES`, `MINIO_IMAGE`, `MINIO_ENDPOINT` e `MINIO_BUCKET`. Obrigatórias: `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD`.
 
 ### Primeira carga do inventário
 
@@ -750,6 +806,8 @@ docker compose exec web npm run db:init
 docker compose exec mysql sh -lc 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > backup.sql
 ```
 
+As fotos de perfil ficam no volume `minio_data`; inclua-o na rotina de backup junto com o banco.
+
 ## Testes e verificação
 
 ```bash
@@ -760,7 +818,7 @@ npm run lint         # ESLint
 npm run build        # build de produção
 ```
 
-- Os testes ficam em `tests/unit/` e cobrem as regras puras e os módulos com dependências injetadas: normalização de coordenadas, planejamento do sync, motor de sync, máquina de estados e alertas de ocorrências, convites e tokens, templates de e-mail (escape de HTML, corte em 100 itens), cliente GDMS (renovação em `401`), cliente HTTP e SSE, rotação do mapa, formatação de datas e preferência da sidebar.
+- Os testes ficam em `tests/unit/` e cobrem as regras puras e os módulos com dependências injetadas: normalização de coordenadas, planejamento do sync, motor de sync, máquina de estados e alertas de ocorrências, convites e tokens, templates de e-mail (escape de HTML, corte em 100 itens), cliente GDMS (renovação em `401`), cliente HTTP e SSE, rotação do mapa, formatação de datas, preferência da sidebar e Minha Conta (tipo de imagem pelo conteúdo, chave da foto, validação dos campos, corte de sessões na troca de senha, serviço de conta e configuração do MinIO).
 - [`vitest.config.ts`](./vitest.config.ts) usa os mesmos aliases do `tsconfig` (`@lib`, `@services`, …) e troca `server-only` por um módulo vazio.
 - `npm run test:e2e` (Playwright) ainda não tem suíte versionada.
 
@@ -784,12 +842,23 @@ npm run build        # build de produção
 | --- | --- | --- |
 | `POST /api/auth/login` | Público | Login |
 | `POST /api/auth/logout` | Público | Logout (apaga os cookies) |
-| `GET /api/me` | Autenticado | Dados do usuário, lidos do banco |
+| `GET /api/me` | Autenticado | Dados do usuário, lidos do banco (inclui cargo, telefone e o endereço da foto) |
 | `POST /api/auth/forgot-password` | Público | Envia o link de redefinição |
 | `POST /api/auth/reset-password` | Público (token) | Grava a nova senha |
 | `GET /api/auth/invite?token=` | Público (token) | Valida o convite e devolve e-mail, papel e validade |
 | `POST /api/auth/accept-invite` | Público (token) | Cria o usuário a partir do convite e autentica |
 | `POST /api/register`, `POST /api/auth/register` | Público, se `ALLOW_SELF_REGISTER=true` | Autocadastro |
+
+### Minha Conta
+
+| Método e rota | Acesso | Função |
+| --- | --- | --- |
+| `PATCH /api/account` | Autenticado | `{ name, jobTitle, phone }` |
+| `POST /api/account/email` | Autenticado | `{ newEmail, currentPassword }`; `400 INVALID_PASSWORD`, `409 EMAIL_TAKEN`; renova o cookie e avisa o e-mail anterior |
+| `POST /api/account/password` | Autenticado | `{ currentPassword, newPassword }`; encerra as outras sessões e renova o cookie desta |
+| `GET /api/account/avatar` | Autenticado | Foto do próprio usuário (`404` sem foto) |
+| `POST /api/account/avatar` | Autenticado | O corpo é a imagem (PNG, JPEG ou WebP, até 512 KB); `415 UNSUPPORTED_IMAGE`, `413 FILE_TOO_LARGE`, `503 STORAGE_UNAVAILABLE` |
+| `DELETE /api/account/avatar` | Autenticado | Remove a foto |
 
 ### APs, histórico e estatísticas
 
@@ -829,7 +898,7 @@ npm run build        # build de produção
 | --- | --- | --- |
 | `GET /api/users` | SUPERADMIN | Lista usuários |
 | `PATCH /api/users/[id]` | SUPERADMIN | Papel, bloqueio, suspensão, reativação |
-| `DELETE /api/users/[id]` | SUPERADMIN | Exclui usuário |
+| `DELETE /api/users/[id]` | SUPERADMIN | Exclui o usuário e a foto de perfil dele |
 | `GET /api/users/invites` | SUPERADMIN | Convites pendentes |
 | `POST /api/users/invites` | SUPERADMIN | `{ email, role }`: cria e envia o convite |
 | `POST /api/users/invites/[id]/resend` | SUPERADMIN | Novo token, nova validade e reenvio |
@@ -877,6 +946,21 @@ docker compose up -d --build web
 
 A rede externa do proxy ainda não existe na máquina: `docker network create web`.
 
+### `docker compose` para com "defina MINIO_ROOT_USER no .env"
+
+O serviço `minio` exige credenciais próprias. Acrescente `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD` (8+ caracteres) ao `.env` e rode o comando de novo.
+
+### Foto de perfil não envia ("armazenamento indisponível")
+
+- `docker compose ps` deve mostrar o `minio` saudável; veja `docker compose logs minio`.
+- O `web` precisa enxergar `MINIO_ENDPOINT` (no compose, `http://minio:9000`) e as credenciais.
+- Se a imagem de `MINIO_IMAGE` não baixar, confira a tag: o repositório oficial `minio/minio` não está mais no Docker Hub.
+- A foto aceita PNG, JPEG ou WebP; outros formatos respondem "Formato não aceito".
+
+### O nome ou o e-mail do superadmin "volta" depois de um restart
+
+Com `SEED_SUPERADMIN_ON_STARTUP=true`, o seed garante a cada startup que exista um superadmin com o `SUPERADMIN_EMAIL` do `.env`. Se o superadmin trocou o e-mail em Minha Conta, o seed não encontra mais a conta e cria outra com o e-mail e a senha do `.env`. Depois do primeiro bootstrap, mantenha `SEED_SUPERADMIN_ON_STARTUP=false`. (O nome editado em Minha Conta é preservado: o seed só define o nome ao criar a conta.)
+
 ### AP não aparece no mapa / continua em Configurações
 
 - O mapa mostra só APs posicionados (`lat`/`lon` diferentes de `0,0`).
@@ -916,7 +1000,7 @@ Sem `TRUST_PROXY_HEADERS=true`, todos os acessos que chegam pelo proxy compartil
 
 ### Usuário é mandado para `/login` de repente
 
-É a revalidação de sessão: o usuário foi excluído, bloqueado ou suspenso (`401 SESSION_REVOKED`). Reative-o na Administração.
+É a revalidação de sessão (`401 SESSION_REVOKED`). Ou o usuário foi excluído, bloqueado ou suspenso (reative-o na Administração), ou a senha da conta foi trocada ou redefinida em outro dispositivo (basta entrar de novo com a senha nova).
 
 ### Worker responde `401`/`403` ou não alcança o `web`
 
