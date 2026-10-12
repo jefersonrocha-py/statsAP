@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildEmailChangedNotice,
   buildIncidentDownDigest,
   buildIncidentRecoveryDigest,
   buildInviteEmail,
@@ -91,6 +92,18 @@ describe("resumos de ocorrência", () => {
 
     expect(email.subject).toBe("[Stats A.P] 1 AP(s) normalizado(s)");
     expect(email.text).toContain("AP 1 | Rede A | 2 h 05 min");
+    expect(email.html).not.toContain("href=");
+  });
+});
+
+describe("buildEmailChangedNotice", () => {
+  it("avisa o endereço antigo, mostra o novo e orienta o que fazer se não foi a pessoa", () => {
+    const email = buildEmailChangedNotice({ name: "<b>Ana</b>", newEmail: "nova@exemplo.com" });
+
+    expect(email.subject).toBe("Seu e-mail de acesso ao Stats A.P foi alterado");
+    expect(email.text).toContain("nova@exemplo.com");
+    expect(email.text).toContain("Se não foi você");
+    expect(email.html).toContain("&lt;b&gt;Ana&lt;/b&gt;");
     expect(email.html).not.toContain("href=");
   });
 });

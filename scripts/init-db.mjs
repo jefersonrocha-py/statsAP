@@ -75,6 +75,16 @@ const INCIDENT_BACKFILL_V1 = [
       "notificationsSeenAt",
       "ALTER TABLE `User` ADD COLUMN `notificationsSeenAt` DATETIME NULL"
     );
+    // Minha Conta: dados pessoais, foto (chave no MinIO) e corte de sessões na troca de senha.
+    await ensureColumn(connection, "User", "phone", "ALTER TABLE `User` ADD COLUMN `phone` VARCHAR(30) NULL");
+    await ensureColumn(connection, "User", "jobTitle", "ALTER TABLE `User` ADD COLUMN `jobTitle` VARCHAR(100) NULL");
+    await ensureColumn(connection, "User", "avatarKey", "ALTER TABLE `User` ADD COLUMN `avatarKey` VARCHAR(120) NULL");
+    await ensureColumn(
+      connection,
+      "User",
+      "passwordChangedAt",
+      "ALTER TABLE `User` ADD COLUMN `passwordChangedAt` DATETIME NULL"
+    );
     await ensureColumn(
       connection,
       "Incident",

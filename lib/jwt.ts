@@ -17,6 +17,9 @@ export type JwtPayload = {
   role: UserRole;
 };
 
+// O token verificado também traz o momento da emissão (iat, em segundos).
+export type VerifiedJwtPayload = JwtPayload & { iat?: number };
+
 function getSecret() {
   const value = process.env.JWT_SECRET?.trim();
   if (!value) throw new Error("Missing required environment variable: JWT_SECRET");
@@ -43,5 +46,5 @@ export async function signAuthToken(payload: JwtPayload) {
 
 export async function verifyAuthToken(token: string) {
   const { payload } = await jwtVerify(token, getSecret(), { issuer, audience });
-  return payload as unknown as JwtPayload;
+  return payload as unknown as VerifiedJwtPayload;
 }

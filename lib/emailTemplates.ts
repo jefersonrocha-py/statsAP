@@ -99,6 +99,19 @@ export function buildInviteEmail(input: {
   });
 }
 
+// Enviado ao endereço antigo: se a troca não foi feita pelo dono da conta, é assim que ele fica sabendo.
+export function buildEmailChangedNotice(input: { name: string; newEmail: string }): EmailContent {
+  return renderEmail({
+    subject: "Seu e-mail de acesso ao Stats A.P foi alterado",
+    heading: `Olá, ${input.name || "usuário"}`,
+    paragraphs: [
+      `O e-mail de acesso da sua conta no Stats A.P foi alterado para ${input.newEmail}.`,
+      "A partir de agora, o login e os avisos da plataforma usam o novo endereço.",
+    ],
+    footnote: "Se não foi você, avise um administrador do Stats A.P imediatamente.",
+  });
+}
+
 export type IncidentDigestItem = {
   antennaName: string;
   networkName: string | null;

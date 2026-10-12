@@ -9,6 +9,7 @@ import {
   verifyAuthToken,
   type JwtPayload,
   type UserRole,
+  type VerifiedJwtPayload,
 } from "@lib/jwt";
 import { dbQueryOne } from "@lib/mysql";
 import {
@@ -18,6 +19,7 @@ import {
   requireTrustedOrigin as requestRequiresTrustedOrigin,
 } from "@lib/requestSecurity";
 import { normalizeRole } from "@lib/roles";
+import { isTokenRevokedByPasswordChange } from "@lib/sessionRules";
 import { getUserAccountStatus } from "@lib/userStatus";
 
 export {
@@ -49,6 +51,7 @@ type SessionUserRow = RowDataPacket & {
   role: string;
   isBlocked: number | boolean;
   suspendedUntil: Date | string | null;
+  passwordChangedAt: Date | string | null;
 };
 
 export function shouldUseSecureCookies() {
@@ -167,16 +170,18 @@ function constantTimeEqual(a: string, b: string) {
   return diff === 0;
 }
 
-export async function loadSessionUser(userId: string): Promise<JwtPayload | null> {
+// issuedAtSeconds é o iat do token: sessões abertas antes da última troca de senha deixam de valer.
+export async function loadSessionUser(userId: string, issuedAtSeconds?: number): Promise<JwtPayload | null> {
   const id = Number(userId);
   if (!Number.isInteger(id) || id <= 0) return null;
 
   const row = await dbQueryOne<SessionUserRow>(
-    "SELECT `id`, `name`, `email`, `role`, `isBlocked`, `suspendedUntil` FROM `User` WHERE `id` = ? LIMIT 1",
+    "SELECT `id`, `name`, `email`, `role`, `isBlocked`, `suspendedUntil`, `passwordChangedAt` FROM `User` WHERE `id` = ? LIMIT 1",
     [id]
   );
   if (!row) return null;
   if (getUserAccountStatus(row).status !== "ACTIVE") return null;
+  if (isTokenRevokedByPasswordChange(issuedAtSeconds, row.passwordChangedAt)) return null;
 
   return {
     sub: String(row.id),
@@ -195,14 +200,14 @@ export async function requireRequestAuth(req: Request, roles?: UserRole[]) {
     if (csrfError) return { response: csrfError };
   }
 
-  let tokenUser: JwtPayload;
+  let tokenUser: VerifiedJwtPayload;
   try {
     tokenUser = await verifyAuthToken(token);
   } catch {
     return { response: deny(401, "UNAUTHORIZED") };
   }
 
-  const user = await loadSessionUser(tokenUser.sub);
+  const user = await loadSessionUser(tokenUser.sub, tokenUser.iat);
   if (!user) return { response: revokedSessionResponse() };
 
   if (roles?.length && !roles.includes(user.role)) {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faChartPie,
+  faCircleUser,
   faChevronLeft,
   faChevronRight,
   faFilter,
@@ -19,7 +20,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UrlObject } from "url";
 import BrandMark from "@components/BrandMark";
+import UserAvatar from "@components/UserAvatar";
 import { APP_VERSION_LABEL } from "@lib/version";
+import { useProfileStore, type UserProfile } from "@store/profile";
 import { useUIStore } from "@store/ui";
 import { connectSSE } from "@services/sseClient";
 
@@ -27,9 +30,7 @@ const SIDEBAR_BACKGROUND =
   "linear-gradient(180deg, rgba(16,78,76,1) 0%, rgba(30,41,41,1) 42%, rgba(12,129,96,0.92) 100%)";
 
 type Role = "SUPERADMIN" | "ADMIN" | "USER";
-type MeResponse =
-  | { ok: true; user: { id: string | number; name: string; email: string; role: Role } }
-  | { ok: false; error: string };
+type MeResponse = { ok: true; user: UserProfile } | { ok: false; error: string };
 type StatsResponse = { ok: true; total: number; up: number; down: number } | { ok: false; error: string };
 
 type NavLink = {
@@ -52,6 +53,8 @@ type SidebarContentProps = {
   expanded: boolean;
   role: Role | null;
   userName: string;
+  fullName: string;
+  avatarUrl: string | null;
   clockLabel: string;
   dateLabel: string;
   stats: { total: number; up: number; down: number };
@@ -101,18 +104,36 @@ function CollapseToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
 function WelcomePanel({
   userName,
+  fullName,
+  avatarUrl,
   clockLabel,
   dateLabel,
+  onNavigate,
 }: {
   userName: string;
+  fullName: string;
+  avatarUrl: string | null;
   clockLabel: string;
   dateLabel: string;
+  onNavigate?: () => void;
 }) {
   return (
     <div className="border-b border-white/10 p-3">
       <div className="rounded-2xl border border-white/10 bg-white/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-        <div className="text-xs uppercase tracking-[0.22em] text-white/60">Bem-vindo</div>
-        <div className="mt-1 text-lg font-semibold">{userName}</div>
+        {/* Foto (ou iniciais) + nome: leva para Minha Conta. */}
+        <Link
+          href={{ pathname: "/account" }}
+          prefetch={false}
+          onClick={onNavigate}
+          title="Minha Conta"
+          className="-m-1 flex items-center gap-3 rounded-xl p-1 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+        >
+          <UserAvatar name={fullName} avatarUrl={avatarUrl} size={44} className="ring-2 ring-white/20" />
+          <span className="min-w-0">
+            <span className="block text-xs uppercase tracking-[0.22em] text-white/60">Bem-vindo</span>
+            <span className="block truncate text-lg font-semibold">{userName}</span>
+          </span>
+        </Link>
         <div className="mt-3 rounded-2xl bg-black/20 px-4 py-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           <div className="font-mono text-2xl tracking-[0.16em]">{clockLabel}</div>
           <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/60">{dateLabel}</div>
@@ -210,6 +231,8 @@ function SidebarContent({
   expanded,
   role,
   userName,
+  fullName,
+  avatarUrl,
   clockLabel,
   dateLabel,
   stats,
@@ -237,6 +260,7 @@ function SidebarContent({
     ...(canManage
       ? [{ path: "/settings", href: { pathname: "/settings" }, icon: faGear, label: "Configurações" }]
       : []),
+    { path: "/account", href: { pathname: "/account" }, icon: faCircleUser, label: "Minha Conta" },
   ];
 
   const isActive = (path: string) => (path === "/" ? pathname === "/" : pathname.startsWith(path));
@@ -271,7 +295,16 @@ function SidebarContent({
         ) : null}
       </div>
 
-      {expanded ? <WelcomePanel userName={userName} clockLabel={clockLabel} dateLabel={dateLabel} /> : null}
+      {expanded ? (
+        <WelcomePanel
+          userName={userName}
+          fullName={fullName}
+          avatarUrl={avatarUrl}
+          clockLabel={clockLabel}
+          dateLabel={dateLabel}
+          onNavigate={onNavigate}
+        />
+      ) : null}
 
       <nav className="space-y-1 overflow-y-auto p-2" aria-label="Menu principal">
         {links.map((link) => (
@@ -315,8 +348,8 @@ function SidebarContent({
 export default function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, setSidebarCollapsed, mobileMenuOpen, setMobileMenuOpen } = useUIStore();
-  const [role, setRole] = useState<Role | null>(null);
-  const [userName, setUserName] = useState("Usuário");
+  const profile = useProfileStore((state) => state.profile);
+  const setProfile = useProfileStore((state) => state.setProfile);
   const [stats, setStats] = useState({ total: 0, up: 0, down: 0 });
   const [now, setNow] = useState<Date | null>(null);
 
@@ -354,13 +387,7 @@ export default function Sidebar() {
         const statsJson: StatsResponse = await statsResponse.json();
         if (!alive) return;
 
-        if (meJson.ok) {
-          setRole(meJson.user.role);
-          setUserName(meJson.user.name || "Usuário");
-        } else {
-          setRole(null);
-          setUserName("Usuário");
-        }
+        setProfile(meJson.ok ? meJson.user : null);
 
         if (statsJson.ok) {
           setStats({
@@ -372,11 +399,8 @@ export default function Sidebar() {
           setStats({ total: 0, up: 0, down: 0 });
         }
       } catch {
-        if (alive) {
-          setRole(null);
-          setUserName("Usuário");
-          setStats({ total: 0, up: 0, down: 0 });
-        }
+        // Falha passageira de rede: mantém o usuário já carregado (Minha Conta pode estar aberta).
+        if (alive) setStats({ total: 0, up: 0, down: 0 });
       }
     }
 
@@ -400,7 +424,7 @@ export default function Sidebar() {
       window.clearInterval(refreshTimer);
       disconnect();
     };
-  }, []);
+  }, [setProfile]);
 
   const clockLabel = useMemo(
     () =>
@@ -426,11 +450,14 @@ export default function Sidebar() {
     [now]
   );
 
-  const firstName = useMemo(() => userName.trim().split(/\s+/)[0] || "Usuário", [userName]);
+  const fullName = profile?.name?.trim() || "Usuário";
+  const firstName = fullName.split(/\s+/)[0];
 
   const contentProps = {
-    role,
+    role: profile?.role ?? null,
     userName: firstName,
+    fullName,
+    avatarUrl: profile?.avatarUrl ?? null,
     clockLabel,
     dateLabel,
     stats,

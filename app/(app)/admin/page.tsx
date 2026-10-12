@@ -17,6 +17,8 @@ type User = {
   isBlocked: boolean;
   suspendedUntil: string | null;
   createdAt: string;
+  phone: string | null;
+  jobTitle: string | null;
 };
 
 type Invite = {
@@ -127,7 +129,7 @@ export default function AdminPage() {
     const query = q.trim().toLowerCase();
     if (!query) return items;
     return items.filter((user) =>
-      [user.name, user.email, user.role, roleLabel(user.role), STATUS_LABELS[user.status]]
+      [user.name, user.email, user.role, roleLabel(user.role), STATUS_LABELS[user.status], user.jobTitle, user.phone]
         .join(" ")
         .toLowerCase()
         .includes(query)
@@ -366,8 +368,8 @@ export default function AdminPage() {
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-black/5 dark:bg-white/10">
               <tr>
-                <th className="p-2 text-left">Nome</th>
-                <th className="p-2 text-left">E-mail</th>
+                <th className="p-2 text-left">Nome e cargo</th>
+                <th className="p-2 text-left">E-mail e telefone</th>
                 <th className="p-2 text-left">Perfil</th>
                 <th className="p-2 text-left">Situação</th>
                 <th className="p-2 text-left">Suspenso até</th>
@@ -383,8 +385,14 @@ export default function AdminPage() {
 
                 return (
                   <tr key={user.id} className="border-t border-black/10 align-top dark:border-white/10">
-                    <td className="p-2 font-medium">{user.name}</td>
-                    <td className="p-2">{user.email}</td>
+                    <td className="p-2">
+                      <div className="font-medium">{user.name}</div>
+                      {user.jobTitle ? <div className="text-xs opacity-65">{user.jobTitle}</div> : null}
+                    </td>
+                    <td className="p-2">
+                      <div>{user.email}</div>
+                      {user.phone ? <div className="text-xs opacity-65">{user.phone}</div> : null}
+                    </td>
                     <td className="p-2">{roleLabel(user.role)}</td>
                     <td className="p-2">
                       <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${badge.className}`}>

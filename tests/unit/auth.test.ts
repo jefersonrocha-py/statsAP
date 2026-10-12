@@ -51,6 +51,30 @@ describe("requireRequestAuth", () => {
     expect(setCookie).toContain("Max-Age=0");
   });
 
+  it("recusa sessão criada antes da troca de senha", async () => {
+    vi.mocked(dbQueryOne).mockResolvedValueOnce({
+      ...activeRow,
+      passwordChangedAt: new Date(Date.now() + 60_000),
+    } as never);
+
+    const result = await requireRequestAuth(await requestWithToken());
+
+    if (!result.response) throw new Error("esperava resposta de erro");
+    expect(result.response.status).toBe(401);
+    expect(await result.response.json()).toEqual({ ok: false, error: "SESSION_REVOKED" });
+  });
+
+  it("mantém sessão criada depois da troca de senha", async () => {
+    vi.mocked(dbQueryOne).mockResolvedValueOnce({
+      ...activeRow,
+      passwordChangedAt: new Date(Date.now() - 60_000),
+    } as never);
+
+    const result = await requireRequestAuth(await requestWithToken());
+
+    expect(result).toMatchObject({ user: { sub: "5" } });
+  });
+
   it("devolve 403 quando o papel no banco não tem permissão", async () => {
     vi.mocked(dbQueryOne).mockResolvedValueOnce({ ...activeRow, role: "USER" } as never);
 

@@ -3,11 +3,14 @@ export const dynamic = "force-dynamic";
 
 import type { RowDataPacket } from "mysql2/promise";
 import { NextResponse } from "next/server";
+import { getAvatarKey } from "@lib/account";
 import { requireRequestAuth } from "@lib/auth";
+import { isAvatarKeyOf } from "@lib/avatarKey";
 import { mapUserRow } from "@lib/dbMappers";
 import { mapDbError } from "@lib/dbErrors";
 import { dbExecute, dbQueryOne } from "@lib/mysql";
 import { checkRateLimit, rateLimitResponse } from "@lib/rateLimit";
+import { removeStoredObject } from "@lib/storage";
 import { z } from "zod";
 
 type UserRow = RowDataPacket & {
@@ -204,7 +207,18 @@ export async function DELETE(
     const guard = await guardSensitiveSuperadminMutation(targetUser);
     if (guard) return guard;
 
+    const avatarKey = await getAvatarKey(userId);
     await dbExecute("DELETE FROM `User` WHERE `id` = ? LIMIT 1", [userId]);
+
+    // A foto de perfil sai junto com a conta. Se o MinIO estiver fora, a exclusão vale mesmo assim.
+    if (isAvatarKeyOf(avatarKey, userId)) {
+      try {
+        await removeStoredObject(avatarKey);
+      } catch (storageError) {
+        console.error("DELETE /api/users/[id]: falha ao apagar a foto do usuário excluído:", avatarKey, storageError);
+      }
+    }
+
     return NextResponse.json({ ok: true, id: userId });
   } catch (error) {
     console.error("DELETE /api/users/[id] error:", error);

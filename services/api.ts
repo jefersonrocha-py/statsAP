@@ -139,7 +139,15 @@ export interface NotificationSummary {
 
 export interface MeResponse {
   ok: boolean;
-  user?: { id: string; name: string; email: string; role: "SUPERADMIN" | "ADMIN" | "USER" };
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    role: "SUPERADMIN" | "ADMIN" | "USER";
+    phone: string | null;
+    jobTitle: string | null;
+    avatarUrl: string | null;
+  };
 }
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);

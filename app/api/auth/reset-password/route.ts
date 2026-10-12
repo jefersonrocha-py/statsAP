@@ -8,6 +8,7 @@ import { requireTrustedOrigin } from "@lib/auth";
 import { dbExecute, dbQueryOne, withTransaction } from "@lib/mysql";
 import { hashPasswordResetToken } from "@lib/passwordReset";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@lib/rateLimit";
+import { sessionCutoff } from "@lib/sessionRules";
 import { strongPasswordSchema } from "@lib/validatorsAuth";
 import { z } from "zod";
 
@@ -81,8 +82,9 @@ export async function POST(req: Request) {
 
     await withTransaction(async (connection) => {
       await dbExecute(
-        "UPDATE `User` SET `passwordHash` = ? WHERE `id` = ?",
-        [passwordHash, activeResetToken.userId],
+        // Quem redefine a senha encerra as sessões abertas antes (ver lib/sessionRules.ts).
+        "UPDATE `User` SET `passwordHash` = ?, `passwordChangedAt` = ? WHERE `id` = ?",
+        [passwordHash, sessionCutoff(now.getTime()), activeResetToken.userId],
         connection
       );
       await dbExecute(

@@ -15,6 +15,8 @@ type UserRow = RowDataPacket & {
   createdAt: Date | string;
   isBlocked: number | boolean;
   suspendedUntil: Date | string | null;
+  phone: string | null;
+  jobTitle: string | null;
 };
 
 // A criação de usuários passou a ser só por convite (POST /api/users/invites).
@@ -24,7 +26,7 @@ export async function GET(req: Request) {
     if ("response" in auth) return auth.response;
 
     const raw = await dbQuery<UserRow>(
-      "SELECT `id`, `name`, `email`, `role`, `createdAt`, `isBlocked`, `suspendedUntil` FROM `User` ORDER BY `id` ASC"
+      "SELECT `id`, `name`, `email`, `role`, `createdAt`, `isBlocked`, `suspendedUntil`, `phone`, `jobTitle` FROM `User` ORDER BY `id` ASC"
     );
 
     return NextResponse.json({ ok: true, total: raw.length, items: raw.map(mapUserRow) });

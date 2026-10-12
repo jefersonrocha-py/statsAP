@@ -7,6 +7,9 @@ const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
   poweredByHeader: false,
+  experimental: {
+    serverComponentsExternalPackages: ["minio"],
+  },
   // Fonte única da versão exibida na interface (sidebar e rodapé).
   env: {
     NEXT_PUBLIC_APP_VERSION: version,

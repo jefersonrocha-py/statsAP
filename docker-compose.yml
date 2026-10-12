@@ -34,6 +34,33 @@ services:
     networks:
       - app_net
 
+  # Armazenamento das fotos de perfil. Sem porta publicada: só o serviço web fala com ele.
+  # O repositório oficial minio/minio saiu do Docker Hub; o padrão é o fork comunitário pgsty/minio,
+  # com a versão fixada. Para usar outra imagem compatível, defina MINIO_IMAGE no .env.
+  minio:
+    image: ${MINIO_IMAGE:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z}
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?defina MINIO_ROOT_USER no .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?defina MINIO_ROOT_PASSWORD no .env (minimo de 8 caracteres)}
+    expose:
+      - "9000"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://minio:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - app_net
+
   web:
     <<: *app_image
     restart: unless-stopped
@@ -42,6 +69,10 @@ services:
       - ./.env
     environment:
       NODE_ENV: ${NODE_ENV}
+      # O web sobe mesmo sem o MinIO: só o envio de foto fica indisponível.
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -87,6 +118,7 @@ services:
 
 volumes:
   mysql_data:
+  minio_data:
 
 networks:
   app_net:
