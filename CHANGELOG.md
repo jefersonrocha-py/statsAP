@@ -3,7 +3,7 @@
 Todas as mudanças relevantes do Stats A.P ficam registradas aqui.
 O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto usa [versionamento semântico](https://semver.org/lang/pt-BR/).
 
-## 1.2.0 — 2026-10-12
+## 1.2.0 — 2026-10-13
 
 ### Adicionado
 
@@ -32,6 +32,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - A consulta de clientes por rede devolve o último valor (com até 10 minutos) enquanto atualiza em segundo plano, em vez de fazer a tela esperar o GWN.
 - No celular, o painel de filtros do mapa começa fechado e os botões do topo mostram só o ícone.
 - O seed do superadmin não sobrescreve mais o nome de uma conta existente (o nome editado em Minha Conta é preservado).
+- Serviços e containers do Compose renomeados para serviço + projeto: `mysql-statsap`, `minio-statsap`, `web-statsap` e `worker-statsap`.
+- Toda a configuração vem do `.env`: o `docker-compose.yml` não traz valores fixos, padrões nem endereços da própria máquina. A rede do proxy e o nome do serviço web nela viraram `PROXY_NETWORK` e `WEB_PROXY_ALIAS`.
 - Excluir um usuário apaga também a foto de perfil dele.
 - O Dashboard carrega os totais e os clientes por rede de forma independente: os cartões não esperam a consulta ao GWN.
 - Uma única conexão SSE por aba, compartilhada por todos os componentes.
@@ -42,6 +44,16 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Revisão de acentuação e pontuação em toda a interface, nas mensagens de validação e nos e-mails.
 - Título da página "Stats A.P" e botão de login "Entrar".
 - README reescrito para a v1.2.
+
+### Segurança
+
+- Os links dos e-mails de convite e de redefinição de senha saem só da URL configurada em `APP_URL`. Antes, sem `APP_URL`, eram montados a partir dos cabeçalhos da requisição, e quem pedisse a redefinição de senha de outra pessoa com cabeçalhos forjados faria o e-mail da vítima apontar para um site seu.
+- Só um SUPERADMIN pode assumir o e-mail de `SUPERADMIN_EMAIL`. Com `SUPERADMIN_PROMOTE_IF_EXISTS=true`, um usuário comum que trocasse o próprio e-mail para esse endereço seria promovido no restart seguinte.
+- Serviços e containers com nome único (serviço + projeto). O serviço web fica na rede do proxy, compartilhada com outros projetos, onde um nome genérico como `mysql` ou `minio` poderia ser resolvido para o container de outro projeto.
+- O healthcheck do MySQL não leva mais a senha de root na linha de comando.
+- O worker exige `APP_BASE_URL` em vez de assumir um endereço padrão para enviar a chave interna.
+- Dependências atualizadas dentro da mesma versão maior: `mysql2` (vazamento de senha para um servidor falso por rebaixamento do método de autenticação), `lodash`, `nanoid`, `source-map-js` e `protocol-buffers-schema`.
+- **Pendente:** `next` 14, `maplibre-gl` 5 e `nodemailer` 8 têm avisos de segurança que só se resolvem trocando de versão maior.
 
 ### Corrigido
 
@@ -65,14 +77,16 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Notas de atualização
 
-- O schema é atualizado sozinho no startup do container `web`; as mudanças são aditivas.
+- O schema é atualizado sozinho no startup do container `web-statsap`; as mudanças são aditivas.
 - Na primeira subida, as ocorrências dos APs que já estavam offline são criadas sem disparar e-mail.
 - O primeiro sync aplica a posição do GWN; a fila de Configurações passa a listar só os APs sem localização no GWN.
-- **Antes de subir:** acrescente `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD` (8+ caracteres) ao `.env`. Sem elas, o `docker compose` para com a mensagem "defina MINIO_ROOT_USER no .env".
+- **Os serviços mudaram de nome.** Rode `docker compose down` antes de atualizar o código, para remover os containers com os nomes antigos; os volumes são preservados.
+- **Antes de subir**, complete o `.env` a partir do `env.example`: as chaves `MINIO_*`, `PROXY_NETWORK`, `WEB_PROXY_ALIAS` e `NEXT_PUBLIC_APP_URL` são novas, e `MYSQL_HOST`, o host de `DATABASE_URL` e `APP_BASE_URL` passam a usar os nomes novos dos serviços.
+- `APP_URL` passa a ser obrigatória para os e-mails de convite e de redefinição de senha.
 - A imagem padrão do MinIO é o fork comunitário `pgsty/minio`, com a versão fixada, porque o repositório oficial `minio/minio` saiu do Docker Hub. Para usar outra imagem compatível, defina `MINIO_IMAGE`.
 - Inclua o volume `minio_data` na rotina de backup.
 - Com `SEED_SUPERADMIN_ON_STARTUP=true`, trocar o e-mail do superadmin em Minha Conta faz o próximo restart criar outra conta com o e-mail do `.env`.
-- Recomendado em produção: `SEED_SUPERADMIN_ON_STARTUP=false` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS=false`. Com `true`, a senha do superadmin volta à do `.env` a cada restart.
+- Recomendado em produção: `SEED_SUPERADMIN_ON_STARTUP=false`, `SUPERADMIN_PROMOTE_IF_EXISTS=false` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS=false`. Com `true`, a senha do superadmin volta à do `.env` a cada restart.
 
 ## 1.1.0
 

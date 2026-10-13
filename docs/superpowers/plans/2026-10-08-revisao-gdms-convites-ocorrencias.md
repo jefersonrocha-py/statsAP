@@ -3077,8 +3077,8 @@ describe("buildPublicUrl", () => {
     expect(buildPublicUrl(req, "/x", {})).toBe("https://stats.exemplo.com/x");
   });
 
-  it("troca 0.0.0.0 por localhost", () => {
-    expect(buildPublicUrl(request(), "/x", {})).toBe("http://localhost:3000/x");
+  it("troca 0.0.0.0 por <host-local>", () => {
+    expect(buildPublicUrl(request(), "/x", {})).toBe("http://<host-local>:3000/x");
   });
 });
 ```
@@ -3287,7 +3287,7 @@ function normalizeOrigin(value?: string | null) {
 function toPublicOrigin(origin: string) {
   const url = new URL(origin);
   if (url.hostname === "0.0.0.0" || url.hostname === "::" || url.hostname === "[::]") {
-    url.hostname = "localhost";
+    url.hostname = "<host-local>";
   }
   return url.origin;
 }
@@ -8450,25 +8450,25 @@ Ambiente isolado: MySQL 8.4 na porta `3399` e Mailpit (captura todo e-mail; nada
 - [ ] **Step 1: Subir MySQL e Mailpit isolados**
 
 ```bash
-docker run -d --name statsap-e2e-mysql -e MYSQL_ROOT_PASSWORD=e2e-root -e MYSQL_DATABASE=statsap_e2e -e MYSQL_USER=statsap -e MYSQL_PASSWORD=e2e-pass -p 127.0.0.1:3399:3306 mysql:8.4 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-docker run -d --name statsap-e2e-mailpit -p 127.0.0.1:8025:8025 -p 127.0.0.1:1025:1025 axllent/mailpit --smtp-auth-accept-any --smtp-auth-allow-insecure
+docker run -d --name statsap-e2e-mysql -e MYSQL_ROOT_PASSWORD=e2e-root -e MYSQL_DATABASE=statsap_e2e -e MYSQL_USER=statsap -e MYSQL_PASSWORD=e2e-pass -p <host-local>:3399:3306 mysql:8.4 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+docker run -d --name statsap-e2e-mailpit -p <host-local>:8025:8025 -p <host-local>:1025:1025 axllent/mailpit --smtp-auth-accept-any --smtp-auth-allow-insecure
 ```
 
-Aguarde até `docker exec statsap-e2e-mysql mysqladmin ping -h 127.0.0.1 -uroot -pe2e-root --silent` responder `mysqld is alive`.
+Aguarde até `docker exec statsap-e2e-mysql mysqladmin ping -h <host-local> -uroot -pe2e-root --silent` responder `mysqld is alive`.
 
 - [ ] **Step 2: Variáveis do ambiente de teste**
 
 Crie `<scratchpad>/e2e.env`:
 
 ```
-DATABASE_URL=mysql://statsap:e2e-pass@127.0.0.1:3399/statsap_e2e
+DATABASE_URL=mysql://statsap:e2e-pass@<host-local>:3399/statsap_e2e
 NODE_ENV=development
 COOKIE_SECURE=false
-APP_URL=http://localhost:3300
-NEXT_PUBLIC_APP_URL=http://localhost:3300
+APP_URL=$APP_URL
+NEXT_PUBLIC_APP_URL=$APP_URL
 JWT_SECRET=e2e-jwt-secret-com-mais-de-32-caracteres-123
 INTERNAL_API_KEY=e2e-internal-key-com-mais-de-24-caracteres
-EMAIL_TRANSPORT_DEFAULT_HOST=127.0.0.1
+EMAIL_TRANSPORT_DEFAULT_HOST=<host-local>
 EMAIL_TRANSPORT_DEFAULT_PORT=1025
 EMAIL_TRANSPORT_DEFAULT_USERNAME=e2e
 EMAIL_TRANSPORT_DEFAULT_PASSWORD=e2e
@@ -8496,12 +8496,12 @@ Expected: a segunda execução não falha; existem `UserInvite`, `Incident`, `In
 
 - [ ] **Step 4: Subir a aplicação**
 
-Em background: `set -a; source <scratchpad>/e2e.env; set +a; npx next dev -p 3300`. Aguarde `curl -s http://localhost:3300/api/health` responder `200`.
+Em background: `set -a; source <scratchpad>/e2e.env; set +a; npx next dev -p 3300`. Aguarde `curl -s $APP_URL/api/health` responder `200`.
 
 - [ ] **Step 5: Sync completo contra o GWN real e conferência das posições**
 
 ```bash
-curl -s -X POST -H "x-internal-api-key: $INTERNAL_API_KEY" http://localhost:3300/api/integrations/gdms/sync > <scratchpad>/sync-full.json
+curl -s -X POST -H "x-internal-api-key: $INTERNAL_API_KEY" $APP_URL/api/integrations/gdms/sync > <scratchpad>/sync-full.json
 node -e "const s=require(process.argv[1]);console.log({ok:s.ok,networks:s.networks,totalFetched:s.totalFetched,created:s.created,withoutCoords:s.withoutCoords,errors:s.errors.length})" <scratchpad>/sync-full.json
 docker exec statsap-e2e-mysql mysql -ustatsap -pe2e-pass statsap_e2e -e "SELECT SUM(lat<>0 AND lon<>0) AS posicionados, SUM(lat=0 AND lon=0) AS sem_posicao, COUNT(*) AS total FROM Antenna;"
 ```
@@ -8512,7 +8512,7 @@ Depois, simule posição manual errada e confira que o GWN vence:
 
 ```bash
 docker exec statsap-e2e-mysql mysql -ustatsap -pe2e-pass statsap_e2e -e "UPDATE Antenna SET lat=-1, lon=-1 WHERE lat<>0 ORDER BY id LIMIT 3;"
-curl -s -X POST -H "x-internal-api-key: $INTERNAL_API_KEY" "http://localhost:3300/api/integrations/gdms/sync?mode=status" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const s=JSON.parse(d);console.log({ok:s.ok,coordsUpdated:s.coordsUpdated,created:s.created})})"
+curl -s -X POST -H "x-internal-api-key: $INTERNAL_API_KEY" "$APP_URL/api/integrations/gdms/sync?mode=status" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const s=JSON.parse(d);console.log({ok:s.ok,coordsUpdated:s.coordsUpdated,created:s.created})})"
 ```
 
 Expected: `coordsUpdated: 3`, `created: 0`.
@@ -8521,10 +8521,10 @@ Expected: `coordsUpdated: 3`, `created: 0`.
 
 ```bash
 JAR=<scratchpad>/admin.cookies
-curl -s -c $JAR -H "Origin: http://localhost:3300" -H "Content-Type: application/json" -d '{"email":"admin@statsap.test","password":"E2e-Admin-Pass#2026"}' http://localhost:3300/api/auth/login
+curl -s -c $JAR -H "Origin: $APP_URL" -H "Content-Type: application/json" -d '{"email":"admin@statsap.test","password":"E2e-Admin-Pass#2026"}' $APP_URL/api/auth/login
 CSRF=$(grep csrf $JAR | awk '{print $7}')
-curl -s -b $JAR http://localhost:3300/api/stats/network-clients | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const s=JSON.parse(d);console.log({source:s.source,totalClients:s.totalClients,generatedAt:s.generatedAt})})"
-curl -s -b $JAR http://localhost:3300/api/stats/network-clients | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).generatedAt))"
+curl -s -b $JAR $APP_URL/api/stats/network-clients | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const s=JSON.parse(d);console.log({source:s.source,totalClients:s.totalClients,generatedAt:s.generatedAt})})"
+curl -s -b $JAR $APP_URL/api/stats/network-clients | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).generatedAt))"
 ```
 
 Expected: `source: "client/list"`; o `generatedAt` da segunda chamada é igual ao da primeira (cache de 60 s).
@@ -8532,11 +8532,11 @@ Expected: `source: "client/list"`; o `generatedAt` da segunda chamada é igual a
 - [ ] **Step 7: Ocorrência ponta a ponta (queda → alerta → volta → aviso)**
 
 ```bash
-H=(-b $JAR -H "Origin: http://localhost:3300" -H "x-csrf-token: $CSRF" -H "Content-Type: application/json")
-ID=$(curl -s "${H[@]}" -d '{"name":"AP Teste E2E","lat":-22.43,"lon":-46.95}' http://localhost:3300/api/antennas | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).item.id))")
-curl -s "${H[@]}" -X PATCH -d '{"status":"UP"}' http://localhost:3300/api/antennas/$ID > /dev/null
-curl -s "${H[@]}" -X PATCH -d '{"status":"DOWN"}' http://localhost:3300/api/antennas/$ID > /dev/null
-curl -s -b $JAR "http://localhost:3300/api/incidents?q=AP%20Teste%20E2E"
+H=(-b $JAR -H "Origin: $APP_URL" -H "x-csrf-token: $CSRF" -H "Content-Type: application/json")
+ID=$(curl -s "${H[@]}" -d '{"name":"AP Teste E2E","lat":-22.43,"lon":-46.95}' $APP_URL/api/antennas | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).item.id))")
+curl -s "${H[@]}" -X PATCH -d '{"status":"UP"}' $APP_URL/api/antennas/$ID > /dev/null
+curl -s "${H[@]}" -X PATCH -d '{"status":"DOWN"}' $APP_URL/api/antennas/$ID > /dev/null
+curl -s -b $JAR "$APP_URL/api/incidents?q=AP%20Teste%20E2E"
 ```
 
 Expected: uma ocorrência `OPEN` para "AP Teste E2E".
@@ -8544,8 +8544,8 @@ Expected: uma ocorrência `OPEN` para "AP Teste E2E".
 Aguarde mais de 1 minuto (`INCIDENT_ALERT_MIN_MINUTES=1`) e rode um ciclo do worker:
 
 ```bash
-curl -s -X POST -H "x-internal-api-key: $INTERNAL_API_KEY" "http://localhost:3300/api/integrations/gdms/sync?mode=status" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).alerts))"
-curl -s "http://localhost:8025/api/v1/messages" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).messages.map(m=>m.Subject)))"
+curl -s -X POST -H "x-internal-api-key: $INTERNAL_API_KEY" "$APP_URL/api/integrations/gdms/sync?mode=status" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).alerts))"
+curl -s "$MAIL_UI_URL/api/v1/messages" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).messages.map(m=>m.Subject)))"
 ```
 
 Expected: `alerts.downSent >= 1` e um e-mail `[Stats A.P] N AP(s) offline` no Mailpit (o N inclui os APs reais que estão offline no GWN).
@@ -8553,10 +8553,10 @@ Expected: `alerts.downSent >= 1` e um e-mail `[Stats A.P] N AP(s) offline` no Ma
 Volte o AP e rode outro ciclo:
 
 ```bash
-curl -s "${H[@]}" -X PATCH -d '{"status":"UP"}' http://localhost:3300/api/antennas/$ID > /dev/null
-curl -s -X POST -H "x-internal-api-key: $INTERNAL_API_KEY" "http://localhost:3300/api/integrations/gdms/sync?mode=status" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).alerts))"
-INC=$(curl -s -b $JAR "http://localhost:3300/api/incidents?status=ALL&q=AP%20Teste%20E2E" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).items[0].id))")
-curl -s -b $JAR http://localhost:3300/api/incidents/$INC | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const i=JSON.parse(d).item;console.log(i.status,i.resolution,i.events.map(e=>e.type))})"
+curl -s "${H[@]}" -X PATCH -d '{"status":"UP"}' $APP_URL/api/antennas/$ID > /dev/null
+curl -s -X POST -H "x-internal-api-key: $INTERNAL_API_KEY" "$APP_URL/api/integrations/gdms/sync?mode=status" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).alerts))"
+INC=$(curl -s -b $JAR "$APP_URL/api/incidents?status=ALL&q=AP%20Teste%20E2E" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).items[0].id))")
+curl -s -b $JAR $APP_URL/api/incidents/$INC | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const i=JSON.parse(d).item;console.log(i.status,i.resolution,i.events.map(e=>e.type))})"
 ```
 
 Expected: `alerts.recoverySent >= 1`; ocorrência `RESOLVED AUTO_RECOVERED` com eventos `OPENED, ALERT_SENT, RECOVERED, AUTO_RESOLVED, RECOVERY_ALERT_SENT`; e-mail `[Stats A.P] N AP(s) normalizado(s)` no Mailpit.
@@ -8564,11 +8564,11 @@ Expected: `alerts.recoverySent >= 1`; ocorrência `RESOLVED AUTO_RECOVERED` com 
 Tratativa manual: derrube de novo, assuma e resolva:
 
 ```bash
-curl -s "${H[@]}" -X PATCH -d '{"status":"DOWN"}' http://localhost:3300/api/antennas/$ID > /dev/null
-INC2=$(curl -s -b $JAR "http://localhost:3300/api/incidents?q=AP%20Teste%20E2E" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).items[0].id))")
-curl -s "${H[@]}" -d '{"action":"START"}' http://localhost:3300/api/incidents/$INC2/actions > /dev/null
-curl -s "${H[@]}" -d '{"action":"RESOLVE","message":"ok"}' http://localhost:3300/api/incidents/$INC2/actions
-curl -s "${H[@]}" -d '{"action":"RESOLVE","message":"Fonte PoE substituída no poste"}' http://localhost:3300/api/incidents/$INC2/actions | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const i=JSON.parse(d).item;console.log(i.status,i.resolution,i.resolvedByName)})"
+curl -s "${H[@]}" -X PATCH -d '{"status":"DOWN"}' $APP_URL/api/antennas/$ID > /dev/null
+INC2=$(curl -s -b $JAR "$APP_URL/api/incidents?q=AP%20Teste%20E2E" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).items[0].id))")
+curl -s "${H[@]}" -d '{"action":"START"}' $APP_URL/api/incidents/$INC2/actions > /dev/null
+curl -s "${H[@]}" -d '{"action":"RESOLVE","message":"ok"}' $APP_URL/api/incidents/$INC2/actions
+curl -s "${H[@]}" -d '{"action":"RESOLVE","message":"Fonte PoE substituída no poste"}' $APP_URL/api/incidents/$INC2/actions | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const i=JSON.parse(d).item;console.log(i.status,i.resolution,i.resolvedByName)})"
 ```
 
 Expected: a resolução com "ok" responde `400 MESSAGE_REQUIRED`; a segunda responde `RESOLVED MANUAL Admin E2E`.
@@ -8576,13 +8576,13 @@ Expected: a resolução com "ok" responde `400 MESSAGE_REQUIRED`; a segunda resp
 - [ ] **Step 8: Convite ponta a ponta e revogação de sessão**
 
 ```bash
-curl -s "${H[@]}" -d '{"email":"convidado@statsap.test","role":"USER"}' http://localhost:3300/api/users/invites
-TOKEN=$(curl -s "http://localhost:8025/api/v1/messages" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const m=JSON.parse(d).messages.find(x=>x.Subject.startsWith('Convite'));console.log(m.ID)})" | xargs -I{} curl -s "http://localhost:8025/api/v1/message/{}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).Text.match(/token=([0-9a-f]{64})/)[1]))")
-curl -s "http://localhost:3300/api/auth/invite?token=$TOKEN"
+curl -s "${H[@]}" -d '{"email":"convidado@statsap.test","role":"USER"}' $APP_URL/api/users/invites
+TOKEN=$(curl -s "$MAIL_UI_URL/api/v1/messages" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const m=JSON.parse(d).messages.find(x=>x.Subject.startsWith('Convite'));console.log(m.ID)})" | xargs -I{} curl -s "$MAIL_UI_URL/api/v1/message/{}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).Text.match(/token=([0-9a-f]{64})/)[1]))")
+curl -s "$APP_URL/api/auth/invite?token=$TOKEN"
 GUEST=<scratchpad>/guest.cookies
-curl -s -c $GUEST -H "Origin: http://localhost:3300" -H "Content-Type: application/json" -d "{\"token\":\"$TOKEN\",\"name\":\"Convidado E2E\",\"password\":\"Convidado-Pass#2026\"}" http://localhost:3300/api/auth/accept-invite
-curl -s -H "Origin: http://localhost:3300" -H "Content-Type: application/json" -d "{\"token\":\"$TOKEN\",\"name\":\"Outro\",\"password\":\"Convidado-Pass#2026\"}" http://localhost:3300/api/auth/accept-invite
-curl -s -b $GUEST http://localhost:3300/api/me
+curl -s -c $GUEST -H "Origin: $APP_URL" -H "Content-Type: application/json" -d "{\"token\":\"$TOKEN\",\"name\":\"Convidado E2E\",\"password\":\"Convidado-Pass#2026\"}" $APP_URL/api/auth/accept-invite
+curl -s -H "Origin: $APP_URL" -H "Content-Type: application/json" -d "{\"token\":\"$TOKEN\",\"name\":\"Outro\",\"password\":\"Convidado-Pass#2026\"}" $APP_URL/api/auth/accept-invite
+curl -s -b $GUEST $APP_URL/api/me
 ```
 
 Expected: o GET devolve `email: convidado@statsap.test`; o primeiro aceite responde `ok: true` com cookies; o segundo responde `400 INVALID_INVITE`; `/api/me` do convidado mostra `role: USER`.
@@ -8590,14 +8590,14 @@ Expected: o GET devolve `email: convidado@statsap.test`; o primeiro aceite respo
 Bloqueie o convidado e confirme que a sessão cai na hora:
 
 ```bash
-GID=$(curl -s -b $GUEST http://localhost:3300/api/me | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).user.id))")
-curl -s "${H[@]}" -X PATCH -d '{"action":"BLOCK"}' http://localhost:3300/api/users/$GID > /dev/null
-curl -s -i -b $GUEST http://localhost:3300/api/me | grep -iE "^HTTP|set-cookie|SESSION_REVOKED"
+GID=$(curl -s -b $GUEST $APP_URL/api/me | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).user.id))")
+curl -s "${H[@]}" -X PATCH -d '{"action":"BLOCK"}' $APP_URL/api/users/$GID > /dev/null
+curl -s -i -b $GUEST $APP_URL/api/me | grep -iE "^HTTP|set-cookie|SESSION_REVOKED"
 ```
 
 Expected: `HTTP/1.1 401`, `set-cookie: auth=; ... Max-Age=0` e corpo com `SESSION_REVOKED`.
 
-- [ ] **Step 9: Conferência visual no navegador (http://localhost:3300, logado como admin)**
+- [ ] **Step 9: Conferência visual no navegador ($APP_URL, logado como admin)**
 
 - Mapa: os APs aparecem posicionados; o controle de rotação gira no mesmo sentido do arraste, sem salto ao tocar, com o "N" do anel apontando para o norte real; "Cidade" e "Pinos" não desfazem a rotação.
 - Configurações: só os APs sem posição no GWN; "Sincronizar GDMS" mostra o painel de resumo.

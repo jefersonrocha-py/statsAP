@@ -4,16 +4,17 @@ x-app-image: &app_image
     dockerfile: Dockerfile
     args:
       NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
   image: ${APP_IMAGE}
   pull_policy: never
 
 services:
-  mysql:
+  mysql-statsap:
     image: ${MYSQL_IMAGE}
+    container_name: mysql-statsap
     restart: unless-stopped
     command:
-      - --port=${MYSQL_PORT:-3306}
+      - --port=${MYSQL_PORT}
       - --character-set-server=${MYSQL_CHARSET}
       - --collation-server=${MYSQL_COLLATION}
     environment:
@@ -22,11 +23,11 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     expose:
-      - "${MYSQL_PORT:-3306}"
+      - "${MYSQL_PORT}"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h mysql -P ${MYSQL_PORT:-3306} -uroot -p${MYSQL_ROOT_PASSWORD} --silent"]
+      test: ["CMD-SHELL", "mysqladmin ping -h ${MYSQL_HOST} -P ${MYSQL_PORT} --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -34,22 +35,18 @@ services:
     networks:
       - app_net
 
-  # Armazenamento das fotos de perfil. Sem porta publicada: só o serviço web fala com ele.
-  # O repositório oficial minio/minio saiu do Docker Hub; o padrão é o fork comunitário pgsty/minio,
-  # com a versão fixada. Para usar outra imagem compatível, defina MINIO_IMAGE no .env.
-  minio:
-    image: ${MINIO_IMAGE:-pgsty/minio:RELEASE.2026-08-04T00-00-00Z}
+  minio-statsap:
+    image: ${MINIO_IMAGE}
+    container_name: minio-statsap
     restart: unless-stopped
     command: server /data
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?defina MINIO_ROOT_USER no .env}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?defina MINIO_ROOT_PASSWORD no .env (minimo de 8 caracteres)}
-    expose:
-      - "9000"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://minio:9000/minio/health/live || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS ${MINIO_ENDPOINT}/minio/health/live || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -61,25 +58,20 @@ services:
     networks:
       - app_net
 
-  web:
+  web-statsap:
     <<: *app_image
+    container_name: web-statsap
     restart: unless-stopped
     init: true
     env_file:
       - ./.env
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      # O web sobe mesmo sem o MinIO: só o envio de foto fica indisponível.
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     depends_on:
-      mysql:
+      mysql-statsap:
         condition: service_healthy
     ports:
       - "${HOST_PORT}:${PORT}"
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://web:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch(process.env.APP_BASE_URL + '/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -90,23 +82,19 @@ services:
       - ALL
     networks:
       app_net:
-      web:
+      proxy:
         aliases:
-          - monitoring-grandstream-web
+          - ${WEB_PROXY_ALIAS}
 
-  worker:
+  worker-statsap:
     <<: *app_image
+    container_name: worker-statsap
     restart: unless-stopped
     init: true
     env_file:
       - ./.env
-    environment:
-      APP_BASE_URL: ${APP_BASE_URL}
-      SYNC_PATH: ${SYNC_PATH}
-      SYNC_INTERVAL_MS: ${SYNC_INTERVAL_MS}
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
     depends_on:
-      web:
+      web-statsap:
         condition: service_healthy
     entrypoint: ["node", "scripts/gdms-cron.mjs"]
     security_opt:
@@ -122,5 +110,6 @@ volumes:
 
 networks:
   app_net:
-  web:
+  proxy:
+    name: ${PROXY_NETWORK}
     external: true

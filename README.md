@@ -94,7 +94,7 @@ Resumo; o detalhe está no [CHANGELOG](./CHANGELOG.md).
 | Armazenamento | MinIO (compatível com S3), cliente `minio` | Fotos de perfil, em bucket privado |
 | Tempo real | Server-Sent Events em `/api/events` | Atualização da interface, toasts e notificações |
 | Testes | Vitest 2 | Testes unitários em `tests/unit/` |
-| Infra | Docker multi-stage + Docker Compose | Serviços `mysql`, `minio`, `web` e `worker` com healthchecks |
+| Infra | Docker multi-stage + Docker Compose | Serviços `mysql-statsap`, `minio-statsap`, `web-statsap` e `worker-statsap` com healthchecks |
 
 ## Arquitetura
 
@@ -105,7 +105,7 @@ flowchart LR
     FE["services/api.ts + services/sseClient.ts<br/>(uma EventSource por aba)"]
   end
 
-  subgraph Web["Container web"]
+  subgraph Web["Container web-statsap"]
     MW["middleware.ts<br/>proteção de páginas + headers + papéis"]
     API["Route Handlers em app/api/*"]
     CORE["lib/*<br/>auth, gdmsSync, incidents, invites, sse, rateLimit"]
@@ -121,7 +121,7 @@ flowchart LR
     SMTP["SMTP"]
   end
 
-  Worker["Container worker<br/>scripts/gdms-cron.mjs"]
+  Worker["Container worker-statsap<br/>scripts/gdms-cron.mjs"]
 
   UI --> FE
   FE --> MW
@@ -137,11 +137,11 @@ flowchart LR
 
 Princípios:
 
-- O navegador nunca chama o GWN; toda comunicação externa sai do container `web`.
+- O navegador nunca chama o GWN; toda comunicação externa sai do container `web-statsap`.
 - As fotos de perfil ficam em um bucket privado do MinIO e saem sempre pela aplicação (`/api/account/avatar`); o MinIO não tem porta publicada.
-- O `worker` não tem cliente GDMS próprio: ele chama a rota interna de sync, que aplica a mesma regra de negócio do botão da interface.
+- O `worker-statsap` não tem cliente GDMS próprio: ele chama a rota interna de sync, que aplica a mesma regra de negócio do botão da interface.
 - `middleware.ts` protege as páginas privadas e bloqueia por papel; as rotas `/api/*` se protegem com `requireRequestAuth(...)` ou `requireRequestAuthOrInternal(...)`.
-- O container `web` aplica o schema e as migrações no startup ([`scripts/docker-entrypoint.sh`](./scripts/docker-entrypoint.sh) → [`scripts/init-db.mjs`](./scripts/init-db.mjs)).
+- O container `web-statsap` aplica o schema e as migrações no startup ([`scripts/docker-entrypoint.sh`](./scripts/docker-entrypoint.sh) → [`scripts/init-db.mjs`](./scripts/init-db.mjs)).
 - Horários são gravados em UTC (`UTC_TIMESTAMP()`, pool com `timezone: "Z"`) e exibidos no fuso `America/Sao_Paulo` ([`lib/dateFormat.ts`](./lib/dateFormat.ts)).
 
 ## Integração GWN/GDMS
@@ -301,7 +301,7 @@ sequenceDiagram
 - Na Administração, a tabela "Convites pendentes" mostra e-mail, papel, quem convidou e a validade, com as ações **Reenviar** (gera token novo e renova a validade) e **Revogar**.
 - Limites: 20 convites/reenvios por hora; validação e aceite do link têm limite por IP.
 - A senha segue a política forte: no mínimo 12 caracteres, com letra minúscula, maiúscula, número e símbolo.
-- O link usa a URL pública da aplicação (`APP_URL` → `NEXT_PUBLIC_APP_URL` → host da requisição), definida em [`lib/publicUrl.ts`](./lib/publicUrl.ts).
+- O link usa a URL pública configurada em `APP_URL` (ou `NEXT_PUBLIC_APP_URL`), montada em [`lib/publicUrl.ts`](./lib/publicUrl.ts). Ele nunca é montado a partir dos cabeçalhos da requisição: sem `APP_URL`, o envio falha e o erro fica no log.
 
 ## Minha Conta
 
@@ -315,12 +315,13 @@ Tela `/account`, disponível para todos os papéis. Abre pelo card "Bem-vindo" d
 | Senha | Troca a senha | Pede a senha atual e segue a política forte; encerra as sessões abertas em outros dispositivos |
 
 - **Onde aparece:** a foto e o nome no card "Bem-vindo" da sidebar; cargo e telefone na lista de usuários da Administração.
-- **Armazenamento da foto:** bucket privado `MINIO_BUCKET` (padrão `statsap-avatars`) do serviço `minio` do compose, criado pela aplicação no primeiro uso. A chave é `avatars/<id do usuário>/<aleatório>.<ext>`, gerada no servidor; cada foto nova ganha uma chave nova e a anterior é apagada. Excluir um usuário apaga a foto dele.
+- **Armazenamento da foto:** bucket privado `MINIO_BUCKET` (padrão `statsap-avatars`) do serviço `minio-statsap` do compose, criado pela aplicação no primeiro uso. A chave é `avatars/<id do usuário>/<aleatório>.<ext>`, gerada no servidor; cada foto nova ganha uma chave nova e a anterior é apagada. Excluir um usuário apaga a foto dele.
 - **Entrega da foto:** sempre por `GET /api/account/avatar` (só a foto do próprio usuário), com `nosniff` e cache privado. O MinIO não tem porta publicada e a CSP não muda.
 - **Sessões e senha:** trocar a senha (aqui ou por "Esqueci a senha") grava `User.passwordChangedAt`; tokens emitidos antes desse momento recebem `401 SESSION_REVOKED`. A sessão que fez a troca recebe um cookie novo e continua ativa.
 - **Senha atual errada** responde `400 INVALID_PASSWORD` (e não `401`, que no cliente significa sessão encerrada).
+- **E-mail reservado:** só um SUPERADMIN pode assumir o endereço de `SUPERADMIN_EMAIL`; para os demais, a troca responde `409 EMAIL_TAKEN`.
 - **Limites:** 5 trocas de e-mail e 5 de senha a cada 15 minutos por usuário; 20 envios de foto por hora.
-- **MinIO fora do ar:** o envio de foto responde `503 STORAGE_UNAVAILABLE` e a sidebar mostra as iniciais; o resto da aplicação não é afetado, e o `web` sobe mesmo sem o MinIO.
+- **MinIO fora do ar:** o envio de foto responde `503 STORAGE_UNAVAILABLE` e a sidebar mostra as iniciais; o resto da aplicação não é afetado, e o `web-statsap` sobe mesmo sem o MinIO.
 
 ## Autenticação, sessão e papéis
 
@@ -635,6 +636,8 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 | `NODE_ENV` | Sim | `production` | Ativa as políticas de segurança e os cookies seguros |
 | `HOST` / `PORT` | Sim | `0.0.0.0` / `3000` | Bind do Next.js dentro do container |
 | `HOST_PORT` | Sim no Compose | `3200` | Porta publicada no host |
+| `PROXY_NETWORK` | Sim no Compose | `web-statsap` | Rede Docker externa do proxy reverso, à qual o serviço web se liga |
+| `WEB_PROXY_ALIAS` | Sim no Compose | `monitoring-grandstream-web` | Nome pelo qual o proxy enxerga o serviço web nessa rede |
 | `APP_URL` | Recomendada | `https://stats.seu-dominio.com` | URL pública: validação de origem e base dos links de e-mail (redefinição e convite) |
 | `NEXT_PUBLIC_APP_URL` | Não | igual a `APP_URL` | Alternativa a `APP_URL`; também vai para o build da imagem |
 | `NEXT_PUBLIC_APP_NAME` | Não | `Etherium Antennas` | Argumento de build da imagem |
@@ -652,7 +655,8 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 | `MYSQL_IMAGE` | Não | `mysql:8.4` | Imagem do banco no Compose |
 | `MYSQL_DATABASE` / `MYSQL_USER` / `MYSQL_PASSWORD` | Sim | `monitoring_grandstream` / `monitoring_app` / … | Banco e usuário da aplicação |
 | `MYSQL_ROOT_PASSWORD` | Sim | … | Senha de administração do MySQL |
-| `DATABASE_URL` | Sim | `mysql://monitoring_app:...@mysql:3306/monitoring_grandstream` | No Compose o host é `mysql`, não `localhost` |
+| `MYSQL_HOST` | Sim no Compose | `mysql-statsap` | Nome do serviço do banco; usado no healthcheck |
+| `DATABASE_URL` | Sim | `mysql://monitoring_app:...@mysql-statsap:3306/monitoring_grandstream` | O host é o nome do serviço do banco (`MYSQL_HOST`) |
 | `MYSQL_POOL_SIZE` | Não | `10` | Tamanho do pool em [`lib/mysql.ts`](./lib/mysql.ts) |
 
 ### GWN/GDMS e worker
@@ -664,7 +668,7 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 | `GDMS_CLIENT_ID` / `GDMS_CLIENT_SECRET` | Sim para integrar | … | Credenciais da OpenAPI do GWN |
 | `GDMS_PAGE_SIZE` | Não | `500` | Itens por página nas listagens |
 | `GDMS_SHOW` | Não | `all` | Filtro de APs enviado ao GWN |
-| `APP_BASE_URL` | Sim no worker | `http://web:3000` | URL **interna** do `web`, usada só pelo worker |
+| `APP_BASE_URL` | Sim | `http://web-statsap:3000` | Endereço **interno** do serviço web: usado pelo worker e pelo healthcheck. Não serve para links de e-mail |
 | `SYNC_PATH` | Sim no worker | `/api/integrations/gdms/sync?mode=status` | Rota chamada a cada ciclo |
 | `SYNC_INTERVAL_MS` | Sim no worker | `300000` | Intervalo do worker (5 minutos) |
 
@@ -687,9 +691,9 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 
 | Variável | Obrigatória | Exemplo | Observação |
 | --- | --- | --- | --- |
-| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Sim no Compose | `statsap` / … | Credenciais do serviço `minio`; senha com 8+ caracteres. O `docker compose` recusa subir sem elas |
-| `MINIO_IMAGE` | Não | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` | Imagem do serviço. O repositório oficial `minio/minio` saiu do Docker Hub; o padrão é o fork comunitário `pgsty/minio`, com a versão fixada |
-| `MINIO_ENDPOINT` | Não no Compose | `http://minio:9000` | Endereço do MinIO visto pelo `web`. Sem ele (fora do Compose), o envio de foto fica desligado |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Sim no Compose | `statsap` / … | Credenciais do serviço `minio-statsap`; senha com 8+ caracteres. O `docker compose` recusa subir sem elas |
+| `MINIO_IMAGE` | Sim no Compose | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` | Imagem do serviço. O repositório oficial `minio/minio` saiu do Docker Hub; o `env.example` traz o fork comunitário `pgsty/minio`, com a versão fixada |
+| `MINIO_ENDPOINT` | Sim no Compose | `http://minio-statsap:9000` | Endereço interno do MinIO: usado pelo serviço web e pelo healthcheck. Sem ele, o envio de foto fica desligado |
 | `MINIO_BUCKET` | Não | `statsap-avatars` | Bucket privado, criado no primeiro uso |
 | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | Não | … | Credenciais próprias do app. Sem elas, o app usa `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` |
 
@@ -704,7 +708,8 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 
 ### Observações
 
-- `FORCE_HTTP` e `GDMS_SYNC_INTERVAL_MS` aparecem no `env.example`, mas o código não as lê; o intervalo do worker é `SYNC_INTERVAL_MS`.
+- Toda a configuração vem do `.env`: o `docker-compose.yml` não traz valores fixos nem padrões. Confira com `docker compose config`, que avisa sobre variável ausente.
+- `FORCE_HTTP`, `GDMS_SYNC_INTERVAL_MS` e `KEY_EMAIL` não são lidas pelo código; o intervalo do worker é `SYNC_INTERVAL_MS`.
 - `APP_BASE_URL` e `APP_URL` não são intercambiáveis: a primeira é interna ao Compose; a segunda precisa abrir no navegador do usuário. Links de e-mail nunca usam `APP_BASE_URL`.
 - `JWT_SECRET` com menos de 32 caracteres impede a autenticação; `INTERNAL_API_KEY` com menos de 24 é recusada.
 
@@ -714,11 +719,11 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 
 ```bash
 cp env.example .env          # PowerShell: Copy-Item env.example .env
-docker compose up -d mysql   # ou um MySQL 8 próprio
+docker compose up -d mysql-statsap   # ou um MySQL 8 próprio
 npm install
 npm run db:init              # schema + migrações
 npm run db:seed              # superadmin a partir de SUPERADMIN_*
-npm run dev                  # http://localhost:3000
+npm run dev                  # porta 3000 da sua máquina
 ```
 
 No `.env`, ajuste pelo menos `NODE_ENV=development`, `COOKIE_SECURE=false`, `DATABASE_URL` (com host acessível da sua máquina), `JWT_SECRET`, `APP_URL`, `SUPERADMIN_*`, as credenciais `GDMS_*` para integrar e `EMAIL_*` para testar convites, redefinição e alertas.
@@ -728,11 +733,11 @@ No `.env`, ajuste pelo menos `NODE_ENV=development`, `COOKIE_SECURE=false`, `DAT
 ### Com Docker (stack completo)
 
 ```bash
-docker network create web    # rede externa usada pelo proxy; uma vez por máquina
+docker network create web    # a rede do proxy (PROXY_NETWORK); uma vez por máquina
 docker compose up -d --build
 ```
 
-Abra `http://localhost:3200` (ou o `HOST_PORT` definido). Para testar localmente com o `.env` de produção sem alterá-lo, use um arquivo de override do Compose (`docker compose -f docker-compose.yml -f override.yml up -d`) que defina `APP_URL: http://localhost:3200` no serviço `web`, para os links de e-mail e a validação de origem apontarem para a máquina local.
+Abra o endereço configurado em `APP_URL`. Para testar em outra máquina com o mesmo `.env`, use um arquivo de override do Compose (`docker compose -f docker-compose.yml -f override.yml up -d`) que redefina `APP_URL` no serviço `web-statsap` com o endereço usado no teste: a validação de origem e os links de e-mail seguem essa variável.
 
 ## Deploy com Docker Compose
 
@@ -740,16 +745,17 @@ Abra `http://localhost:3200` (ou o `HOST_PORT` definido). Para testar localmente
 
 | Serviço | Função | Healthcheck | Porta |
 | --- | --- | --- | --- |
-| `mysql` | MySQL 8.4 com volume `mysql_data` | `mysqladmin ping` | Só interna (`mysql:3306`) |
-| `minio` | Fotos de perfil, com volume `minio_data` | `GET /minio/health/live` em `minio` | Só interna (`minio:9000`) |
-| `web` | Interface, APIs, SSE, schema e seed no startup | `GET /api/health` em `web` | `${HOST_PORT}:${PORT}` |
-| `worker` | Sync periódico com o GWN | Aguarda o `web` saudável | — |
+| `mysql-statsap` | MySQL 8.4 com volume `mysql_data` | `mysqladmin ping` | Só interna (`mysql-statsap:3306`) |
+| `minio-statsap` | Fotos de perfil, com volume `minio_data` | `GET /minio/health/live` em `minio-statsap` | Só interna (`minio-statsap:9000`) |
+| `web-statsap` | Interface, APIs, SSE, schema e seed no startup | `GET /api/health` em `web-statsap` | `${HOST_PORT}:${PORT}` |
+| `worker-statsap` | Sync periódico com o GWN | Aguarda o `web-statsap` saudável | — |
 
-- `web` e `worker` leem `./.env` via `env_file` e rodam com `no-new-privileges` e `cap_drop: [ALL]`.
-- O `web` usa o `server.js` de `.next/standalone` (`output: "standalone"`).
-- O `web` participa da rede externa `web` (proxy reverso); `mysql`, `minio` e `worker` ficam só na rede interna `app_net`.
-- O `web` não depende do `minio` para subir: sem ele, só o envio de foto fica indisponível.
-- Os healthchecks usam os nomes de serviço (`mysql`, `web`), nunca `localhost`.
+- `web-statsap` e `worker-statsap` leem `./.env` via `env_file` e rodam com `no-new-privileges` e `cap_drop: [ALL]`, assim como o `minio-statsap`.
+- O `web-statsap` usa o `server.js` de `.next/standalone` (`output: "standalone"`).
+- O `web-statsap` participa da rede externa do proxy reverso (`PROXY_NETWORK`), onde é conhecido pelo nome `WEB_PROXY_ALIAS`; `mysql-statsap`, `minio-statsap` e `worker-statsap` ficam só na rede interna `app_net`.
+- O `web-statsap` não depende do `minio-statsap` para subir: sem ele, só o envio de foto fica indisponível.
+- Serviços e containers seguem o padrão serviço + projeto. O serviço web também está na rede do proxy, compartilhada com outros projetos, e um nome genérico ali poderia ser resolvido para o container de outro projeto.
+- Os healthchecks usam esses nomes, lidos do `.env` (`MYSQL_HOST`, `MINIO_ENDPOINT`, `APP_BASE_URL`), e não carregam senha na linha de comando.
 
 ### Antes do primeiro `up` em produção
 
@@ -757,32 +763,43 @@ Abra `http://localhost:3200` (ou o `HOST_PORT` definido). Para testar localmente
 - [ ] `COOKIE_SECURE=true` com HTTPS.
 - [ ] `APP_URL` com a URL pública real (base dos links de convite e redefinição).
 - [ ] `TRUST_PROXY_HEADERS=true` somente atrás de proxy confiável.
-- [ ] `APP_BASE_URL=http://web:3000` para o worker.
-- [ ] `SEED_SUPERADMIN_ON_STARTUP=false` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS=false` depois do primeiro bootstrap.
+- [ ] `APP_BASE_URL=http://web-statsap:3000`, `MYSQL_HOST=mysql-statsap` e `MINIO_ENDPOINT=http://minio-statsap:9000` (os nomes dos serviços).
+- [ ] `SEED_SUPERADMIN_ON_STARTUP=false`, `SUPERADMIN_PROMOTE_IF_EXISTS=false` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS=false`. Em um banco novo, crie o superadmin uma vez com `docker compose exec web-statsap node scripts/seed-superadmin.mjs`.
+- [ ] Se o proxy reverso alcança o serviço web pela rede do proxy, avalie remover a publicação de porta (`ports`): com ela, o app também responde direto no host, sem TLS.
 - [ ] SMTP preenchido (convites, redefinição e alertas) e destinatários ADMIN/SUPERADMIN com e-mail válido.
 - [ ] Credenciais GDMS preenchidas.
 - [ ] `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD` definidos (senha com 8+ caracteres).
 - [ ] Backup dos volumes `mysql_data` e `minio_data`.
 
-### Startup do `web`
+### Startup do `web-statsap`
 
 1. [`scripts/init-db.mjs`](./scripts/init-db.mjs) aplica o schema, as colunas novas e as migrações únicas (`SchemaMigration`).
 2. Com `SEED_SUPERADMIN_ON_STARTUP=true` e `SUPERADMIN_*` preenchidos, roda [`scripts/seed-superadmin.mjs`](./scripts/seed-superadmin.mjs).
 3. Sobe o Next.js em modo produção.
-4. O `worker` espera o `web` ficar saudável e passa a chamar o sync em modo `status` a cada `SYNC_INTERVAL_MS`.
+4. O `worker-statsap` espera o `web-statsap` ficar saudável e passa a chamar o sync em modo `status` a cada `SYNC_INTERVAL_MS`.
 
 ### Atualizar para a v1.2
 
-Antes, acrescente ao `.env` as credenciais do MinIO (`MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD`); sem elas o `docker compose` para com a mensagem "defina MINIO_ROOT_USER no .env".
+Os serviços mudaram de nome (serviço + projeto). Derrube o stack **antes** de atualizar o código, para o Compose remover os containers com os nomes antigos. Os volumes (banco e fotos) são preservados.
 
 ```bash
+docker compose down
 git pull
+# acrescente ao .env as chaves novas do env.example (lista abaixo)
 docker compose up -d --build
 ```
 
+No `.env`:
+
+- **Novas e obrigatórias:** `MINIO_IMAGE`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ENDPOINT`, `MINIO_BUCKET`, `PROXY_NETWORK`, `WEB_PROXY_ALIAS` e `NEXT_PUBLIC_APP_URL`.
+- **Mudam de valor:** `MYSQL_HOST=mysql-statsap`, o host dentro de `DATABASE_URL` (`@mysql-statsap:3306`) e `APP_BASE_URL=http://web-statsap:3000`.
+- **Novas, com o valor do `env.example`:** `TRUST_PROXY_HEADERS`, `MYSQL_POOL_SIZE`, `INVITE_TOKEN_HOURS`, `INCIDENT_ALERTS_ENABLED` e `INCIDENT_ALERT_MIN_MINUTES`.
+- `APP_URL` passa a ser obrigatória para os e-mails de convite e de redefinição de senha.
+
+Depois da subida:
+
 - O schema é atualizado sozinho no startup. Na primeira subida, as ocorrências dos APs que já estavam offline são criadas sem disparar e-mail.
 - O primeiro sync aplica a posição do GWN a todos os APs que têm localização configurada lá; a fila de Configurações passa a listar só os que não têm.
-- Variáveis novas com padrão: `INVITE_TOKEN_HOURS`, `INCIDENT_ALERTS_ENABLED`, `INCIDENT_ALERT_MIN_MINUTES`, `MINIO_IMAGE`, `MINIO_ENDPOINT` e `MINIO_BUCKET`. Obrigatórias: `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD`.
 
 ### Primeira carga do inventário
 
@@ -792,18 +809,19 @@ O worker roda em `mode=status` e **não cria APs novos**. Em ambiente novo, faç
 - pelo terminal:
 
 ```bash
-curl -X POST http://localhost:3200/api/integrations/gdms/sync \
-  -H "x-internal-api-key: SUA_CHAVE_INTERNA"
+docker compose exec worker-statsap node -e "fetch(process.env.APP_BASE_URL + '/api/integrations/gdms/sync', { method: 'POST', headers: { 'x-internal-api-key': process.env.INTERNAL_API_KEY } }).then((r) => r.json()).then(console.log)"
 ```
+
+O comando roda dentro do container do worker, que já tem o endereço interno e a chave no ambiente.
 
 ### Manutenção
 
 ```bash
 docker compose ps
-docker compose logs -f web worker
-docker compose restart worker
-docker compose exec web npm run db:init
-docker compose exec mysql sh -lc 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > backup.sql
+docker compose logs -f web-statsap worker-statsap
+docker compose restart worker-statsap
+docker compose exec web-statsap npm run db:init
+docker compose exec mysql-statsap sh -lc 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > backup.sql
 ```
 
 As fotos de perfil ficam no volume `minio_data`; inclua-o na rotina de backup junto com o banco.
@@ -826,13 +844,13 @@ npm run build        # build de produção
 
 | Recurso | Endpoint ou comando | Objetivo |
 | --- | --- | --- |
-| Saúde do backend | `GET /api/health` | Confere a conexão do `web` com o MySQL |
+| Saúde do backend | `GET /api/health` | Confere a conexão do `web-statsap` com o MySQL |
 | Teste do GWN | `GET /api/integrations/gdms/ping` | Confirma token e acesso ao inventário remoto |
 | Token do GWN | `GET` / `POST /api/integrations/gdms/token` | Mostra a validade / força a renovação |
 | Sync completo | `POST /api/integrations/gdms/sync` | Inventário, status, posição e ocorrências; devolve o resumo |
 | Sync de status | `POST /api/integrations/gdms/sync?mode=status` | O que o worker roda a cada 5 minutos |
 | Ocorrências | `/incidents` ou `GET /api/incidents` | Quedas abertas, tratativas e histórico |
-| Logs | `docker compose logs -f web worker` | Autenticação, banco, SSE, sync e envio de e-mail |
+| Logs | `docker compose logs -f web-statsap worker-statsap` | Autenticação, banco, SSE, sync e envio de e-mail |
 
 ## Endpoints
 
@@ -910,7 +928,7 @@ A criação direta de usuário (`POST /api/users`) foi substituída pelo convite
 
 | Script | Efeito |
 | --- | --- |
-| `npm run dev` | Desenvolvimento em `http://localhost:3000` |
+| `npm run dev` | Desenvolvimento, na porta 3000 |
 | `npm run build` / `npm run start` | Build e servidor de produção |
 | `npm run lint` | ESLint |
 | `npm test` / `npm run test:watch` | Testes unitários (Vitest) |
@@ -927,10 +945,10 @@ A criação direta de usuário (`POST /api/users`) foi substituída pelo convite
 
 ## Solução de problemas
 
-### `web` não fica saudável
+### `web-statsap` não fica saudável
 
-- `/api/health` retorna `503` ou o container reinicia: confira `DATABASE_URL` (host `mysql`, porta `3306` no Compose) e a coerência com `MYSQL_*`.
-- Acompanhe `docker compose logs -f mysql web` e, se necessário, rode `docker compose exec web npm run db:init`.
+- `/api/health` retorna `503` ou o container reinicia: confira `DATABASE_URL` (host `mysql-statsap`, porta `3306` no Compose) e a coerência com `MYSQL_*`.
+- Acompanhe `docker compose logs -f mysql-statsap web-statsap` e, se necessário, rode `docker compose exec web-statsap npm run db:init`.
 
 ### `exec ./scripts/docker-entrypoint.sh: no such file or directory` (Windows)
 
@@ -939,21 +957,21 @@ O script foi para a imagem com quebra de linha CRLF. O `.gitattributes` força `
 ```bash
 rm scripts/docker-entrypoint.sh
 git checkout -- scripts/docker-entrypoint.sh
-docker compose up -d --build web
+docker compose up -d --build web-statsap
 ```
 
 ### `network web declared as external, but could not be found`
 
-A rede externa do proxy ainda não existe na máquina: `docker network create web`.
+A rede externa do proxy ainda não existe na máquina. Crie-a com o nome definido em `PROXY_NETWORK`: `docker network create web`.
 
-### `docker compose` para com "defina MINIO_ROOT_USER no .env"
+### `docker compose` para com "required variable MINIO_ROOT_USER is missing a value"
 
-O serviço `minio` exige credenciais próprias. Acrescente `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD` (8+ caracteres) ao `.env` e rode o comando de novo.
+O serviço `minio-statsap` exige credenciais próprias, para nunca subir com a senha de fábrica. Acrescente `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD` (8+ caracteres) ao `.env` e rode o comando de novo.
 
 ### Foto de perfil não envia ("armazenamento indisponível")
 
-- `docker compose ps` deve mostrar o `minio` saudável; veja `docker compose logs minio`.
-- O `web` precisa enxergar `MINIO_ENDPOINT` (no compose, `http://minio:9000`) e as credenciais.
+- `docker compose ps` deve mostrar o `minio-statsap` saudável; veja `docker compose logs minio-statsap`.
+- O `web-statsap` precisa enxergar `MINIO_ENDPOINT` (no compose, `http://minio-statsap:9000`) e as credenciais.
 - Se a imagem de `MINIO_IMAGE` não baixar, confira a tag: o repositório oficial `minio/minio` não está mais no Docker Hub.
 - A foto aceita PNG, JPEG ou WebP; outros formatos respondem "Formato não aceito".
 
@@ -978,15 +996,15 @@ Já existe um sync rodando (normalmente o ciclo do worker). Aguarde o término e
 - O alerta só sai depois de `INCIDENT_ALERT_MIN_MINUTES` offline e no fim de um sync.
 - Os destinatários são ADMIN e SUPERADMIN ativos; confira se há algum e se o e-mail deles é válido.
 - Ocorrências criadas na implantação (AP que já estava offline) não geram e-mail, por desenho.
-- Falha de SMTP aparece no log do `web`; o envio é tentado de novo no próximo ciclo.
+- Falha de SMTP aparece no log do `web-statsap`; o envio é tentado de novo no próximo ciclo.
 
 ### Convite inválido ou expirado
 
 O link vale `INVITE_TOKEN_HOURS` e uma única vez; reenviar ou convidar de novo invalida o link anterior. Peça ao SUPERADMIN para usar **Reenviar** na Administração. Se o link aponta para um host interno, ajuste `APP_URL`.
 
-### E-mail com link para `0.0.0.0`, `web` ou host interno
+### E-mails de convite ou de redefinição de senha não chegam
 
-Configure `APP_URL` com o endereço que abre no navegador (por exemplo `https://stats.seu-dominio.com`). `PASSWORD_RESET_BASE_URL` só serve para sobrescrever o link de redefinição.
+Os links desses e-mails saem só da `APP_URL` (ou de `PASSWORD_RESET_BASE_URL`, no caso da redefinição); a aplicação nunca usa os cabeçalhos da requisição para montá-los. Sem `APP_URL` válida, o envio falha e o log do `web-statsap` mostra "URL pública não configurada". Configure `APP_URL` com o endereço que abre no navegador (por exemplo `https://stats.seu-dominio.com`).
 
 ### Limite de requisições bloqueia todo mundo atrás do proxy
 
@@ -1002,11 +1020,11 @@ Sem `TRUST_PROXY_HEADERS=true`, todos os acessos que chegam pelo proxy compartil
 
 É a revalidação de sessão (`401 SESSION_REVOKED`). Ou o usuário foi excluído, bloqueado ou suspenso (reative-o na Administração), ou a senha da conta foi trocada ou redefinida em outro dispositivo (basta entrar de novo com a senha nova).
 
-### Worker responde `401`/`403` ou não alcança o `web`
+### Worker responde `401`/`403` ou não alcança o `web-statsap`
 
-- Mantenha `APP_BASE_URL=http://web:3000` (nunca `localhost` dentro do container).
-- `INTERNAL_API_KEY` deve ser idêntica no `web` e no `worker`.
-- Confira se o `web` está saudável antes de olhar o worker.
+- Mantenha `APP_BASE_URL=http://web-statsap:3000`: é o nome do serviço na rede interna do Compose.
+- `INTERNAL_API_KEY` deve ser idêntica no `web-statsap` e no `worker-statsap`.
+- Confira se o `web-statsap` está saudável antes de olhar o worker.
 
 ### Worker não cria APs novos
 
@@ -1030,7 +1048,7 @@ Sem `TRUST_PROXY_HEADERS=true`, todos os acessos que chegam pelo proxy compartil
 
 ### Sessão não persiste em HTTPS ou atrás de proxy
 
-Use `COOKIE_SECURE=true` com HTTPS, encaminhe host e protocolo corretamente e alinhe `APP_URL`. Não teste cookie seguro em `http://localhost`.
+Use `COOKIE_SECURE=true` com HTTPS, encaminhe host e protocolo corretamente e alinhe `APP_URL`. Cookie seguro só funciona em endereço HTTPS.
 
 ## Licença
 
