@@ -40,7 +40,7 @@ describe("sendInviteEmail", () => {
   it("envia o link público /accept-invite com o token", async () => {
     process.env.APP_URL = "https://stats.exemplo.com";
 
-    await sendInviteEmail(new Request("http://web:3000/api/users/invites"), {
+    await sendInviteEmail({
       email: "novo@exemplo.com",
       role: "ADMIN",
       token: "abc123",

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
+import { isReservedSuperadminEmail } from "@lib/account";
 import { requireTrustedOrigin } from "@lib/auth";
 import { mapDbError } from "@lib/dbErrors";
 import { dbExecute } from "@lib/mysql";
@@ -38,6 +39,10 @@ export async function POST(req: Request) {
     });
     if (!rateLimit.ok) {
       return rateLimitResponse(rateLimit);
+    }
+
+    if (isReservedSuperadminEmail(normalizedEmail)) {
+      return NextResponse.json({ ok: false, error: "UNIQUE_CONSTRAINT", field: "email" }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);

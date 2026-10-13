@@ -1,6 +1,8 @@
-const BASE =
-  process.env.APP_BASE_URL ||
-  `http://${process.env.WEB_HOST || "web"}:${process.env.WEB_PORT || 3000}`;
+const BASE = process.env.APP_BASE_URL?.trim();
+if (!BASE) {
+  console.error("[gdms-cron] APP_BASE_URL não definida: informe o endereço interno do serviço web no .env.");
+  process.exit(1);
+}
 const PATH = process.env.SYNC_PATH || "/api/integrations/gdms/sync?mode=status";
 const INTERVAL = Number(process.env.SYNC_INTERVAL_MS || 5 * 60 * 1000);
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "";

@@ -60,7 +60,6 @@ export async function POST(req: Request) {
 
     if (user) {
       const { expiresAt, token, tokenHash } = createPasswordResetToken();
-      const resetUrl = buildPasswordResetUrl(req, token);
       const now = new Date();
 
       await dbExecute(
@@ -73,12 +72,14 @@ export async function POST(req: Request) {
         [user.id, tokenHash, expiresAt]
       );
 
+      // Falha no envio (SMTP fora, APP_URL não configurada) fica no log: a resposta é sempre a mesma,
+      // para não revelar se o e-mail existe.
       try {
         await sendMail({
           to: user.email,
           ...buildPasswordResetEmail({
             name: user.name,
-            resetUrl,
+            resetUrl: buildPasswordResetUrl(token),
             ttlMinutes: getPasswordResetTokenTtlMinutes(),
           }),
         });

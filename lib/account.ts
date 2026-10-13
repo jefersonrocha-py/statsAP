@@ -59,6 +59,13 @@ function toProfile(row: AccountRow): AccountProfile {
   };
 }
 
+// Com SUPERADMIN_PROMOTE_IF_EXISTS, o seed promove a SUPERADMIN quem tiver o e-mail SUPERADMIN_EMAIL.
+// Por isso esse endereço é reservado: só quem já é SUPERADMIN pode assumi-lo.
+export function isReservedSuperadminEmail(email: string) {
+  const reserved = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
+  return Boolean(reserved) && email.trim().toLowerCase() === reserved;
+}
+
 function isDuplicateEntry(error: unknown) {
   return (error as { code?: string } | null)?.code === "ER_DUP_ENTRY";
 }
@@ -87,6 +94,9 @@ export async function changeAccountEmail(userId: number, input: ChangeEmailInput
       const passwordOk = await bcrypt.compare(input.currentPassword, row.passwordHash);
       if (!passwordOk) return { ok: false, error: "INVALID_PASSWORD" };
       if (input.newEmail === row.email.toLowerCase()) return { ok: false, error: "SAME_EMAIL" };
+      if (isReservedSuperadminEmail(input.newEmail) && normalizeRole(row.role) !== "SUPERADMIN") {
+        return { ok: false, error: "EMAIL_TAKEN" };
+      }
 
       const taken = await dbQueryOne<IdRow>(
         "SELECT `id` FROM `User` WHERE `email` = ? AND `id` <> ? LIMIT 1",

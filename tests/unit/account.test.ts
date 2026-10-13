@@ -27,6 +27,7 @@ function executedSql() {
 }
 
 beforeEach(async () => {
+  delete process.env.SUPERADMIN_EMAIL;
   vi.mocked(dbQueryOne).mockReset();
   vi.mocked(dbExecute).mockReset();
   vi.mocked(dbExecute).mockResolvedValue({ affectedRows: 1 } as never);
@@ -104,6 +105,27 @@ describe("changeAccountEmail", () => {
 
     expect(result).toEqual({ ok: false, error: "EMAIL_TAKEN" });
     expect(dbExecute).not.toHaveBeenCalled();
+  });
+
+  it("usuário comum não assume o e-mail reservado do superadmin do .env", async () => {
+    process.env.SUPERADMIN_EMAIL = "Root@Exemplo.com";
+    vi.mocked(dbQueryOne).mockResolvedValueOnce(row as never);
+
+    const result = await changeAccountEmail(5, { newEmail: "root@exemplo.com", currentPassword: CURRENT_PASSWORD });
+
+    expect(result).toEqual({ ok: false, error: "EMAIL_TAKEN" });
+    expect(dbExecute).not.toHaveBeenCalled();
+  });
+
+  it("o próprio superadmin pode voltar ao e-mail reservado", async () => {
+    process.env.SUPERADMIN_EMAIL = "root@exemplo.com";
+    vi.mocked(dbQueryOne)
+      .mockResolvedValueOnce({ ...row, role: "SUPERADMIN" } as never)
+      .mockResolvedValueOnce(null as never);
+
+    const result = await changeAccountEmail(5, { newEmail: "root@exemplo.com", currentPassword: CURRENT_PASSWORD });
+
+    expect(result).toMatchObject({ ok: true, profile: { email: "root@exemplo.com" } });
   });
 
   it("troca o e-mail e informa o endereço anterior", async () => {

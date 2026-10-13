@@ -21,6 +21,6 @@ export function createPasswordResetToken() {
   };
 }
 
-export function buildPasswordResetUrl(req: Request, token: string) {
-  return buildPublicUrl(req, "/reset-password", { token }, process.env.PASSWORD_RESET_BASE_URL);
+export function buildPasswordResetUrl(token: string) {
+  return buildPublicUrl("/reset-password", { token }, process.env.PASSWORD_RESET_BASE_URL);
 }

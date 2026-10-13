@@ -56,7 +56,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const item = mapInviteRow({ ...row, tokenHash, expiresAt } as InviteRow, now);
 
     try {
-      await sendInviteEmail(req, { email: row.email, role: row.role, token, expiresAt, inviterName: auth.user.name });
+      await sendInviteEmail({ email: row.email, role: row.role, token, expiresAt, inviterName: auth.user.name });
     } catch (emailError) {
       console.error("POST /api/users/invites/[id]/resend sendMail error:", emailError);
       return NextResponse.json({ ok: false, error: "INVITE_EMAIL_FAILED", item }, { status: 502 });

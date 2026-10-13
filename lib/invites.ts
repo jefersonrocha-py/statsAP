@@ -45,11 +45,14 @@ export function mapInviteRow(row: InviteRow, now = new Date()): InviteItem {
   };
 }
 
-export async function sendInviteEmail(
-  req: Request,
-  input: { email: string; role: string; token: string; expiresAt: Date; inviterName: string }
-) {
-  const acceptUrl = buildPublicUrl(req, "/accept-invite", { token: input.token });
+export async function sendInviteEmail(input: {
+  email: string;
+  role: string;
+  token: string;
+  expiresAt: Date;
+  inviterName: string;
+}) {
+  const acceptUrl = buildPublicUrl("/accept-invite", { token: input.token });
   await sendMail({
     to: input.email,
     ...buildInviteEmail({
