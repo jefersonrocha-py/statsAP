@@ -21,9 +21,7 @@ COPY . .
 RUN npm run build
 
 FROM base AS runner
-ENV NODE_ENV=production \
-    HOST=0.0.0.0 \
-    PORT=3000
+ENV NODE_ENV=production
 WORKDIR /app
 
 COPY --from=builder /app/.next/standalone ./
@@ -37,6 +35,5 @@ RUN chmod +x /app/scripts/docker-entrypoint.sh \
  && chown -R node:node /app
 
 USER node
-EXPOSE 3000
 
 ENTRYPOINT ["./scripts/docker-entrypoint.sh"]

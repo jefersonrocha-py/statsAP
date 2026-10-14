@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+: "${HOST:?defina HOST no .env}"
+: "${PORT:?defina PORT no .env}"
+
 echo "Applying database schema..."
 node scripts/init-db.mjs
 
@@ -11,7 +14,7 @@ else
   echo "Skipping automatic superadmin seed."
 fi
 
-echo "Starting Next.js on ${HOST:-0.0.0.0}:${PORT:-3000}"
-export HOSTNAME="${HOST:-0.0.0.0}"
-export PORT="${PORT:-3000}"
+echo "Starting Next.js on ${HOST}:${PORT}"
+export HOSTNAME="${HOST}"
+export PORT
 exec node server.js

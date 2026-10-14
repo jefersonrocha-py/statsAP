@@ -5,9 +5,9 @@ const creds = { MINIO_ACCESS_KEY: "chave", MINIO_SECRET_KEY: "segredo" };
 
 describe("parseStorageConfig", () => {
   it("lê o endpoint interno do compose", () => {
-    expect(parseStorageConfig({ MINIO_ENDPOINT: "http://minio:9000", ...creds })).toEqual({
-      endPoint: "minio",
-      port: 9000,
+    expect(parseStorageConfig({ MINIO_ENDPOINT: "http://minio-statsap:38430", ...creds })).toEqual({
+      endPoint: "minio-statsap",
+      port: 38430,
       useSSL: false,
       accessKey: "chave",
       secretKey: "segredo",
@@ -19,19 +19,19 @@ describe("parseStorageConfig", () => {
     expect(
       parseStorageConfig({ MINIO_ENDPOINT: "https://s3.exemplo.com", MINIO_BUCKET: "fotos", ...creds })
     ).toMatchObject({ endPoint: "s3.exemplo.com", port: 443, useSSL: true, bucket: "fotos" });
-    expect(parseStorageConfig({ MINIO_ENDPOINT: "http://minio", ...creds })).toMatchObject({ port: 80 });
+    expect(parseStorageConfig({ MINIO_ENDPOINT: "http://minio-statsap", ...creds })).toMatchObject({ port: 80 });
   });
 
   it("usa as credenciais do servidor quando as do app não foram definidas", () => {
     expect(
-      parseStorageConfig({ MINIO_ENDPOINT: "http://minio:9000", MINIO_ROOT_USER: "root", MINIO_ROOT_PASSWORD: "senha" })
+      parseStorageConfig({ MINIO_ENDPOINT: "http://minio-statsap:38430", MINIO_ROOT_USER: "root", MINIO_ROOT_PASSWORD: "senha" })
     ).toMatchObject({ accessKey: "root", secretKey: "senha" });
   });
 
   it("devolve null quando o armazenamento não está configurado", () => {
     expect(parseStorageConfig({})).toBeNull();
-    expect(parseStorageConfig({ MINIO_ENDPOINT: "http://minio:9000" })).toBeNull();
-    expect(parseStorageConfig({ MINIO_ENDPOINT: "minio sem protocolo", ...creds })).toBeNull();
-    expect(parseStorageConfig({ MINIO_ENDPOINT: "ftp://minio:21", ...creds })).toBeNull();
+    expect(parseStorageConfig({ MINIO_ENDPOINT: "http://minio-statsap:38430" })).toBeNull();
+    expect(parseStorageConfig({ MINIO_ENDPOINT: "minio-statsap sem protocolo", ...creds })).toBeNull();
+    expect(parseStorageConfig({ MINIO_ENDPOINT: "ftp://minio-statsap:38431", ...creds })).toBeNull();
   });
 });

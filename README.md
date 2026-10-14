@@ -401,6 +401,7 @@ Tela `/account`, disponível para todos os papéis. Abre pelo card "Bem-vindo" d
 ### Tema
 
 - O botão da barra superior alterna entre claro e escuro. A preferência fica em [`store/theme.ts`](./store/theme.ts) e é aplicada globalmente por [`components/ThemeSync.tsx`](./components/ThemeSync.tsx), sem piscar na carga ([`components/ThemeScript.tsx`](./components/ThemeScript.tsx)).
+- As telas de login, de senha e de convite têm visual fixo, sempre claro: o tema escolhido no app não vale para elas ([`lib/themeScope.ts`](./lib/themeScope.ts)).
 
 ### Rotação do mapa
 
@@ -634,7 +635,7 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 | Variável | Obrigatória | Exemplo | Observação |
 | --- | --- | --- | --- |
 | `NODE_ENV` | Sim | `production` | Ativa as políticas de segurança e os cookies seguros |
-| `HOST` / `PORT` | Sim | `0.0.0.0` / `3000` | Bind do Next.js dentro do container |
+| `HOST` / `PORT` | Sim | `0.0.0.0` / `38410` | Endereço de escuta e porta do Next.js dentro do container (porta não padrão) |
 | `HOST_PORT` | Sim no Compose | `3200` | Porta publicada no host |
 | `PROXY_NETWORK` | Sim no Compose | `web-statsap` | Rede Docker externa do proxy reverso, à qual o serviço web se liga |
 | `WEB_PROXY_ALIAS` | Sim no Compose | `monitoring-grandstream-web` | Nome pelo qual o proxy enxerga o serviço web nessa rede |
@@ -656,7 +657,8 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 | `MYSQL_DATABASE` / `MYSQL_USER` / `MYSQL_PASSWORD` | Sim | `monitoring_grandstream` / `monitoring_app` / … | Banco e usuário da aplicação |
 | `MYSQL_ROOT_PASSWORD` | Sim | … | Senha de administração do MySQL |
 | `MYSQL_HOST` | Sim no Compose | `mysql-statsap` | Nome do serviço do banco; usado no healthcheck |
-| `DATABASE_URL` | Sim | `mysql://monitoring_app:...@mysql-statsap:3306/monitoring_grandstream` | O host é o nome do serviço do banco (`MYSQL_HOST`) |
+| `MYSQL_PORT` | Sim no Compose | `38420` | Porta do MySQL dentro da rede interna (não padrão) |
+| `DATABASE_URL` | Sim | `mysql://monitoring_app:...@mysql-statsap:38420/monitoring_grandstream` | O host é o nome do serviço do banco (`MYSQL_HOST`) |
 | `MYSQL_POOL_SIZE` | Não | `10` | Tamanho do pool em [`lib/mysql.ts`](./lib/mysql.ts) |
 
 ### GWN/GDMS e worker
@@ -668,7 +670,7 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 | `GDMS_CLIENT_ID` / `GDMS_CLIENT_SECRET` | Sim para integrar | … | Credenciais da OpenAPI do GWN |
 | `GDMS_PAGE_SIZE` | Não | `500` | Itens por página nas listagens |
 | `GDMS_SHOW` | Não | `all` | Filtro de APs enviado ao GWN |
-| `APP_BASE_URL` | Sim | `http://web-statsap:3000` | Endereço **interno** do serviço web: usado pelo worker e pelo healthcheck. Não serve para links de e-mail |
+| `APP_BASE_URL` | Sim | `http://web-statsap:38410` | Endereço **interno** do serviço web: usado pelo worker e pelo healthcheck. Não serve para links de e-mail |
 | `SYNC_PATH` | Sim no worker | `/api/integrations/gdms/sync?mode=status` | Rota chamada a cada ciclo |
 | `SYNC_INTERVAL_MS` | Sim no worker | `300000` | Intervalo do worker (5 minutos) |
 
@@ -693,7 +695,9 @@ Use [`env.example`](./env.example) como base. As tabelas abaixo listam o que mud
 | --- | --- | --- | --- |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Sim no Compose | `statsap` / … | Credenciais do serviço `minio-statsap`; senha com 8+ caracteres. O `docker compose` recusa subir sem elas |
 | `MINIO_IMAGE` | Sim no Compose | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` | Imagem do serviço. O repositório oficial `minio/minio` saiu do Docker Hub; o `env.example` traz o fork comunitário `pgsty/minio`, com a versão fixada |
-| `MINIO_ENDPOINT` | Sim no Compose | `http://minio-statsap:9000` | Endereço interno do MinIO: usado pelo serviço web e pelo healthcheck. Sem ele, o envio de foto fica desligado |
+| `MINIO_ENDPOINT` | Sim no Compose | `http://minio-statsap:38430` | Endereço interno do MinIO: usado pelo serviço web e pelo healthcheck. Sem ele, o envio de foto fica desligado |
+| `MINIO_PORT` | Sim no Compose | `38430` | Porta da API do MinIO dentro da rede interna (não padrão); a mesma de `MINIO_ENDPOINT` |
+| `MINIO_BROWSER` | Sim no Compose | `off` | Console web do MinIO desligado: não abre outra porta |
 | `MINIO_BUCKET` | Não | `statsap-avatars` | Bucket privado, criado no primeiro uso |
 | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | Não | … | Credenciais próprias do app. Sem elas, o app usa `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` |
 
@@ -723,7 +727,7 @@ docker compose up -d mysql-statsap   # ou um MySQL 8 próprio
 npm install
 npm run db:init              # schema + migrações
 npm run db:seed              # superadmin a partir de SUPERADMIN_*
-npm run dev                  # porta 3000 da sua máquina
+npm run dev                  # na porta definida em PORT no .env
 ```
 
 No `.env`, ajuste pelo menos `NODE_ENV=development`, `COOKIE_SECURE=false`, `DATABASE_URL` (com host acessível da sua máquina), `JWT_SECRET`, `APP_URL`, `SUPERADMIN_*`, as credenciais `GDMS_*` para integrar e `EMAIL_*` para testar convites, redefinição e alertas.
@@ -745,8 +749,8 @@ Abra o endereço configurado em `APP_URL`. Para testar em outra máquina com o m
 
 | Serviço | Função | Healthcheck | Porta |
 | --- | --- | --- | --- |
-| `mysql-statsap` | MySQL 8.4 com volume `mysql_data` | `mysqladmin ping` | Só interna (`mysql-statsap:3306`) |
-| `minio-statsap` | Fotos de perfil, com volume `minio_data` | `GET /minio/health/live` em `minio-statsap` | Só interna (`minio-statsap:9000`) |
+| `mysql-statsap` | MySQL 8.4 com volume `mysql_data` | `mysqladmin ping` | Só interna (`mysql-statsap:38420`) |
+| `minio-statsap` | Fotos de perfil, com volume `minio_data` | `GET /minio/health/live` em `minio-statsap` | Só interna (`minio-statsap:38430`) |
 | `web-statsap` | Interface, APIs, SSE, schema e seed no startup | `GET /api/health` em `web-statsap` | `${HOST_PORT}:${PORT}` |
 | `worker-statsap` | Sync periódico com o GWN | Aguarda o `web-statsap` saudável | — |
 
@@ -754,6 +758,7 @@ Abra o endereço configurado em `APP_URL`. Para testar em outra máquina com o m
 - O `web-statsap` usa o `server.js` de `.next/standalone` (`output: "standalone"`).
 - O `web-statsap` participa da rede externa do proxy reverso (`PROXY_NETWORK`), onde é conhecido pelo nome `WEB_PROXY_ALIAS`; `mysql-statsap`, `minio-statsap` e `worker-statsap` ficam só na rede interna `app_net`.
 - O `web-statsap` não depende do `minio-statsap` para subir: sem ele, só o envio de foto fica indisponível.
+- Nenhum serviço usa a porta padrão do seu software: as portas vêm de `PORT`, `MYSQL_PORT` e `MINIO_PORT`, e o console web do MinIO fica desligado.
 - Serviços e containers seguem o padrão serviço + projeto. O serviço web também está na rede do proxy, compartilhada com outros projetos, e um nome genérico ali poderia ser resolvido para o container de outro projeto.
 - Os healthchecks usam esses nomes, lidos do `.env` (`MYSQL_HOST`, `MINIO_ENDPOINT`, `APP_BASE_URL`), e não carregam senha na linha de comando.
 
@@ -763,7 +768,7 @@ Abra o endereço configurado em `APP_URL`. Para testar em outra máquina com o m
 - [ ] `COOKIE_SECURE=true` com HTTPS.
 - [ ] `APP_URL` com a URL pública real (base dos links de convite e redefinição).
 - [ ] `TRUST_PROXY_HEADERS=true` somente atrás de proxy confiável.
-- [ ] `APP_BASE_URL=http://web-statsap:3000`, `MYSQL_HOST=mysql-statsap` e `MINIO_ENDPOINT=http://minio-statsap:9000` (os nomes dos serviços).
+- [ ] `APP_BASE_URL=http://web-statsap:38410`, `MYSQL_HOST=mysql-statsap` e `MINIO_ENDPOINT=http://minio-statsap:38430` (os nomes dos serviços).
 - [ ] `SEED_SUPERADMIN_ON_STARTUP=false`, `SUPERADMIN_PROMOTE_IF_EXISTS=false` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS=false`. Em um banco novo, crie o superadmin uma vez com `docker compose exec web-statsap node scripts/seed-superadmin.mjs`.
 - [ ] Se o proxy reverso alcança o serviço web pela rede do proxy, avalie remover a publicação de porta (`ports`): com ela, o app também responde direto no host, sem TLS.
 - [ ] SMTP preenchido (convites, redefinição e alertas) e destinatários ADMIN/SUPERADMIN com e-mail válido.
@@ -792,7 +797,9 @@ docker compose up -d --build
 No `.env`:
 
 - **Novas e obrigatórias:** `MINIO_IMAGE`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_ENDPOINT`, `MINIO_BUCKET`, `PROXY_NETWORK`, `WEB_PROXY_ALIAS` e `NEXT_PUBLIC_APP_URL`.
-- **Mudam de valor:** `MYSQL_HOST=mysql-statsap`, o host dentro de `DATABASE_URL` (`@mysql-statsap:3306`) e `APP_BASE_URL=http://web-statsap:3000`.
+- **Mudam de valor:** `MYSQL_HOST=mysql-statsap`, `PORT`, `MYSQL_PORT`, o host e a porta dentro de `DATABASE_URL` (`@mysql-statsap:38420`) e `APP_BASE_URL=http://web-statsap:38410`. As portas deixam de ser as padrão.
+- **Novas:** `MINIO_PORT` e `MINIO_BROWSER=off`.
+- **Proxy reverso:** ele precisa apontar para a porta nova do web (`WEB_PROXY_ALIAS` na porta de `PORT`).
 - **Novas, com o valor do `env.example`:** `TRUST_PROXY_HEADERS`, `MYSQL_POOL_SIZE`, `INVITE_TOKEN_HOURS`, `INCIDENT_ALERTS_ENABLED` e `INCIDENT_ALERT_MIN_MINUTES`.
 - `APP_URL` passa a ser obrigatória para os e-mails de convite e de redefinição de senha.
 
@@ -928,7 +935,7 @@ A criação direta de usuário (`POST /api/users`) foi substituída pelo convite
 
 | Script | Efeito |
 | --- | --- |
-| `npm run dev` | Desenvolvimento, na porta 3000 |
+| `npm run dev` | Desenvolvimento, na porta definida em `PORT` no `.env` |
 | `npm run build` / `npm run start` | Build e servidor de produção |
 | `npm run lint` | ESLint |
 | `npm test` / `npm run test:watch` | Testes unitários (Vitest) |
@@ -947,7 +954,7 @@ A criação direta de usuário (`POST /api/users`) foi substituída pelo convite
 
 ### `web-statsap` não fica saudável
 
-- `/api/health` retorna `503` ou o container reinicia: confira `DATABASE_URL` (host `mysql-statsap`, porta `3306` no Compose) e a coerência com `MYSQL_*`.
+- `/api/health` retorna `503` ou o container reinicia: confira `DATABASE_URL` (host `mysql-statsap`, porta igual a `MYSQL_PORT`) e a coerência com `MYSQL_*`.
 - Acompanhe `docker compose logs -f mysql-statsap web-statsap` e, se necessário, rode `docker compose exec web-statsap npm run db:init`.
 
 ### `exec ./scripts/docker-entrypoint.sh: no such file or directory` (Windows)
@@ -971,7 +978,7 @@ O serviço `minio-statsap` exige credenciais próprias, para nunca subir com a s
 ### Foto de perfil não envia ("armazenamento indisponível")
 
 - `docker compose ps` deve mostrar o `minio-statsap` saudável; veja `docker compose logs minio-statsap`.
-- O `web-statsap` precisa enxergar `MINIO_ENDPOINT` (no compose, `http://minio-statsap:9000`) e as credenciais.
+- O `web-statsap` precisa enxergar `MINIO_ENDPOINT` (no compose, `http://minio-statsap:38430`) e as credenciais.
 - Se a imagem de `MINIO_IMAGE` não baixar, confira a tag: o repositório oficial `minio/minio` não está mais no Docker Hub.
 - A foto aceita PNG, JPEG ou WebP; outros formatos respondem "Formato não aceito".
 
@@ -1022,7 +1029,7 @@ Sem `TRUST_PROXY_HEADERS=true`, todos os acessos que chegam pelo proxy compartil
 
 ### Worker responde `401`/`403` ou não alcança o `web-statsap`
 
-- Mantenha `APP_BASE_URL=http://web-statsap:3000`: é o nome do serviço na rede interna do Compose.
+- Mantenha `APP_BASE_URL=http://web-statsap:38410`: é o nome do serviço na rede interna do Compose.
 - `INTERNAL_API_KEY` deve ser idêntica no `web-statsap` e no `worker-statsap`.
 - Confira se o `web-statsap` está saudável antes de olhar o worker.
 

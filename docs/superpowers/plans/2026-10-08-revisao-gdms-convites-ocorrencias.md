@@ -2984,7 +2984,7 @@ describe("mapDbError", () => {
   });
 
   it("erro desconhecido vira DB_ERROR genérico", () => {
-    const mapped = mapDbError(new Error("connect ECONNREFUSED 10.0.0.5:3306"));
+    const mapped = mapDbError(new Error("connect ECONNREFUSED 10.0.0.5:38420"));
     expect(mapped).toEqual({ status: 500, body: { ok: false, error: "DB_ERROR" } });
     expect(JSON.stringify(mapped)).not.toContain("10.0.0.5");
   });
@@ -3042,7 +3042,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { buildPublicUrl } from "@lib/publicUrl";
 
 function request(headers: Record<string, string> = {}) {
-  return new Request("http://0.0.0.0:3000/api/x", { headers });
+  return new Request("http://0.0.0.0:38410/api/x", { headers });
 }
 
 describe("buildPublicUrl", () => {
@@ -3073,12 +3073,12 @@ describe("buildPublicUrl", () => {
 
   it("usa X-Forwarded-* com TRUST_PROXY_HEADERS=true", () => {
     process.env.TRUST_PROXY_HEADERS = "true";
-    const req = request({ "x-forwarded-proto": "https", "x-forwarded-host": "stats.exemplo.com", host: "web:3000" });
+    const req = request({ "x-forwarded-proto": "https", "x-forwarded-host": "stats.exemplo.com", host: "web-statsap:38410" });
     expect(buildPublicUrl(req, "/x", {})).toBe("https://stats.exemplo.com/x");
   });
 
   it("troca 0.0.0.0 por <host-local>", () => {
-    expect(buildPublicUrl(request(), "/x", {})).toBe("http://<host-local>:3000/x");
+    expect(buildPublicUrl(request(), "/x", {})).toBe("http://<host-local>:38410/x");
   });
 });
 ```
@@ -3852,7 +3852,7 @@ describe("sendInviteEmail", () => {
   it("envia o link público /accept-invite com o token", async () => {
     process.env.APP_URL = "https://stats.exemplo.com";
 
-    await sendInviteEmail(new Request("http://web:3000/api/users/invites"), {
+    await sendInviteEmail(new Request("http://web-statsap:38410/api/users/invites"), {
       email: "novo@exemplo.com",
       role: "ADMIN",
       token: "abc123",
@@ -8450,7 +8450,7 @@ Ambiente isolado: MySQL 8.4 na porta `3399` e Mailpit (captura todo e-mail; nada
 - [ ] **Step 1: Subir MySQL e Mailpit isolados**
 
 ```bash
-docker run -d --name statsap-e2e-mysql -e MYSQL_ROOT_PASSWORD=e2e-root -e MYSQL_DATABASE=statsap_e2e -e MYSQL_USER=statsap -e MYSQL_PASSWORD=e2e-pass -p <host-local>:3399:3306 mysql:8.4 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+docker run -d --name statsap-e2e-mysql -e MYSQL_ROOT_PASSWORD=e2e-root -e MYSQL_DATABASE=statsap_e2e -e MYSQL_USER=statsap -e MYSQL_PASSWORD=e2e-pass -p <host-local>:3399:38420 mysql:8.4 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 docker run -d --name statsap-e2e-mailpit -p <host-local>:8025:8025 -p <host-local>:1025:1025 axllent/mailpit --smtp-auth-accept-any --smtp-auth-allow-insecure
 ```
 

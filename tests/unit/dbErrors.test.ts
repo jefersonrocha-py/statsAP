@@ -11,7 +11,7 @@ describe("mapDbError", () => {
   });
 
   it("erro desconhecido vira DB_ERROR genérico", () => {
-    const mapped = mapDbError(new Error("connect ECONNREFUSED 10.0.0.5:3306"));
+    const mapped = mapDbError(new Error("connect ECONNREFUSED 10.0.0.5:38420"));
     expect(mapped).toEqual({ status: 500, body: { ok: false, error: "DB_ERROR" } });
     expect(JSON.stringify(mapped)).not.toContain("10.0.0.5");
   });

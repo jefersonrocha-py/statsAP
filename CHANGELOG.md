@@ -51,13 +51,14 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Só um SUPERADMIN pode assumir o e-mail de `SUPERADMIN_EMAIL`. Com `SUPERADMIN_PROMOTE_IF_EXISTS=true`, um usuário comum que trocasse o próprio e-mail para esse endereço seria promovido no restart seguinte.
 - Serviços e containers com nome único (serviço + projeto). O serviço web fica na rede do proxy, compartilhada com outros projetos, onde um nome genérico como `mysql` ou `minio` poderia ser resolvido para o container de outro projeto.
 - O healthcheck do MySQL não leva mais a senha de root na linha de comando.
+- Nenhum serviço usa a porta padrão do seu software: web, MySQL e MinIO usam portas definidas no `.env`, e o console web do MinIO fica desligado.
 - O worker exige `APP_BASE_URL` em vez de assumir um endereço padrão para enviar a chave interna.
 - Dependências atualizadas dentro da mesma versão maior: `mysql2` (vazamento de senha para um servidor falso por rebaixamento do método de autenticação), `lodash`, `nanoid`, `source-map-js` e `protocol-buffers-schema`.
 - **Pendente:** `next` 14, `maplibre-gl` 5 e `nodemailer` 8 têm avisos de segurança que só se resolvem trocando de versão maior.
 
 ### Corrigido
 
-- Partículas da tela de login: com o sistema operacional em modo escuro, o app claro mostrava a paleta escura (quase invisível), e todas as partículas eram recriadas a cada troca de tema. Agora seguem só o tema do app e não são recriadas.
+- O tema escolhido no app vazava para as telas de login, de senha e de convite (inclusive ao sair do app pelo botão "Sair"), e as partículas do fundo eram recriadas a cada troca. Essas telas agora têm visual fixo, sempre claro, e as partículas não mudam.
 - Painel da ocorrência, menu do sino e diálogo "Nova antena" estavam semitransparentes e o conteúdo de trás vazava por baixo do texto.
 - Rotação do mapa: toques seguidos nas setas ou nos botões de 45° perdiam parte do giro.
 - Clientes no celular: os cards de rede passavam da borda da tela.
@@ -81,6 +82,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Na primeira subida, as ocorrências dos APs que já estavam offline são criadas sem disparar e-mail.
 - O primeiro sync aplica a posição do GWN; a fila de Configurações passa a listar só os APs sem localização no GWN.
 - **Os serviços mudaram de nome.** Rode `docker compose down` antes de atualizar o código, para remover os containers com os nomes antigos; os volumes são preservados.
+- **Portas:** `PORT`, `MYSQL_PORT` e as portas em `DATABASE_URL`, `APP_BASE_URL` e `MINIO_ENDPOINT` mudam para portas não padrão; `MINIO_PORT` e `MINIO_BROWSER` são novas. O proxy reverso precisa apontar para a porta nova do web.
 - **Antes de subir**, complete o `.env` a partir do `env.example`: as chaves `MINIO_*`, `PROXY_NETWORK`, `WEB_PROXY_ALIAS` e `NEXT_PUBLIC_APP_URL` são novas, e `MYSQL_HOST`, o host de `DATABASE_URL` e `APP_BASE_URL` passam a usar os nomes novos dos serviços.
 - `APP_URL` passa a ser obrigatória para os e-mails de convite e de redefinição de senha.
 - A imagem padrão do MinIO é o fork comunitário `pgsty/minio`, com a versão fixada, porque o repositório oficial `minio/minio` saiu do Docker Hub. Para usar outra imagem compatível, defina `MINIO_IMAGE`.

@@ -26,6 +26,9 @@ function createMysqlPool() {
   if (!database) {
     throw new Error("DATABASE_URL must include a database name.");
   }
+  if (!url.port) {
+    throw new Error("DATABASE_URL must include the port (MYSQL_PORT).");
+  }
 
   const poolSize = Number(process.env.MYSQL_POOL_SIZE ?? 10);
   const connectionLimit =
@@ -33,7 +36,7 @@ function createMysqlPool() {
 
   return mysql.createPool({
     host: url.hostname,
-    port: url.port ? Number(url.port) : 3306,
+    port: Number(url.port),
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database,
