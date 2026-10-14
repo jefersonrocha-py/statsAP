@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { displayedTheme } from "@lib/themeScope";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
@@ -21,13 +22,15 @@ export function resolveTheme(theme: ThemeMode): ResolvedTheme {
   return theme === "system" ? getSystemTheme() : theme;
 }
 
+// A preferência vale para o app; as telas de autenticação ficam sempre claras (lib/themeScope.ts).
 function applyTheme(theme: ThemeMode) {
   const resolvedTheme = resolveTheme(theme);
 
   if (typeof window !== "undefined") {
     const root = document.documentElement;
-    root.classList.toggle("dark", resolvedTheme === "dark");
-    root.style.colorScheme = resolvedTheme;
+    const shown = displayedTheme(resolvedTheme, window.location.pathname);
+    root.classList.toggle("dark", shown === "dark");
+    root.style.colorScheme = shown;
     root.dataset.theme = theme;
 
     try {
@@ -57,6 +60,7 @@ type ThemeState = {
   setTheme: (theme: ThemeMode) => void;
   toggle: () => void;
   syncSystemTheme: () => void;
+  reapply: () => void;
 };
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
@@ -80,6 +84,11 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     if (get().theme !== "system") return;
     const resolvedTheme = applyTheme("system");
     set({ resolvedTheme, initialized: true });
+  },
+  // Reaplica ao trocar de tela: entrar ou sair do login muda o que deve aparecer.
+  reapply: () => {
+    if (!get().initialized) return;
+    applyTheme(get().theme);
   },
 }));
 

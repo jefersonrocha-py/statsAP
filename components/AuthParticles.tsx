@@ -4,8 +4,8 @@ import Particles from "react-tsparticles";
 import type { Engine, ISourceOptions } from "tsparticles-engine";
 import { loadSlim } from "tsparticles-slim";
 
-// As opções são fixas: se mudassem com o tema, a biblioteca destruiria e recriaria as partículas
-// a cada troca. A diferença entre os temas fica no CSS do contêiner (ver className abaixo).
+// Opções fixas: as telas de autenticação não seguem o tema do app (lib/themeScope.ts), e as
+// partículas nunca são recriadas.
 const PARTICLE_COLOR = "#065f46"; // emerald-800: contrasta no fundo claro
 
 const OPTIONS: ISourceOptions = {
@@ -40,15 +40,13 @@ async function particlesInit(engine: Engine) {
  * Partículas leves para telas de auth.
  * - Wrapper (pai) com `relative isolate`
  * - Este canvas fica em `z-0`; card principal em `z-10`
- * - No tema escuro (classe `dark` do app, não a preferência do sistema), o brilho leva o verde
- *   ao tom neon e a opacidade cai, sem tocar nas partículas.
  */
 export default function AuthParticles() {
   return (
     <Particles
       id="auth-particles"
       init={particlesInit}
-      className="pointer-events-none absolute inset-0 z-0 transition-[filter,opacity] duration-300 dark:opacity-60 dark:brightness-[2.7]"
+      className="pointer-events-none absolute inset-0 z-0"
       options={OPTIONS}
     />
   );
