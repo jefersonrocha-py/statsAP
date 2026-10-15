@@ -1,8 +1,12 @@
 import bcrypt from "bcryptjs";
 import { createMysqlConnection } from "./mysql-utils.mjs";
 
-const email = (process.env.SUPERADMIN_EMAIL || "admin@local.test").toLowerCase();
-const password = process.env.SUPERADMIN_PASSWORD || "Admin123!";
+const email = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
+const password = process.env.SUPERADMIN_PASSWORD;
+if (!email || !password) {
+  console.error("Defina SUPERADMIN_EMAIL e SUPERADMIN_PASSWORD no .env.");
+  process.exit(1);
+}
 const name = process.env.SUPERADMIN_NAME || "Super Admin";
 
 (async () => {
