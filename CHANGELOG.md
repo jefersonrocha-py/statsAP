@@ -13,11 +13,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - **Central de notificações** no sino da barra superior, com contador de não lidas, últimas ocorrências, "Ver todas" e "Marcar como lidas". O aviso "AP offline" ganhou o link "Ver ocorrência".
 - **Convite de usuário por e-mail**: o SUPERADMIN convida pelo e-mail e escolhe o papel; o link (uso único, validade de `INVITE_TOKEN_HOURS`) leva à tela `/accept-invite`. Convites pendentes podem ser reenviados ou revogados.
 - **Minha Conta** (`/account`): cada usuário edita nome, cargo e telefone, troca o e-mail de acesso e a senha (as duas confirmadas pela senha atual) e envia, troca ou remove a foto de perfil. A foto aparece no card "Bem-vindo" da sidebar; cargo e telefone aparecem na Administração.
+- **Bootstrap do usuário padrão**: a cada startup, se o banco não tem nenhum SUPERADMIN, o `web-statsap` cria o superadmin do `.env` (`SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`, `SUPERADMIN_NAME`). Num banco existente ele não faz nada: não regrava senha, não promove conta nem recria quem já existe.
 - **Serviço MinIO** (`minio-statsap`) para as fotos de perfil: só na rede interna, bucket privado criado no primeiro uso, e as fotos saem sempre pela aplicação. Se o MinIO cair, só o envio de foto fica indisponível.
 - **Sidebar retrátil** com botão de seta na borda, preferência salva no navegador e gaveta própria no celular (abre pelo ☰, fecha pelo X, pelo fundo, por Esc ou ao trocar de página).
 - **Identidade visual** com símbolo e nome "Stats A.P" na sidebar e no rodapé, ícone da aba e versão do `package.json` exibida na interface.
 - **Resumo do sync** em Configurações: criados, atualizados, coordenadas aplicadas, APs sem posição no GWN e erros.
-- **Testes automatizados** com Vitest (`npm test`): 29 arquivos, 197 testes.
+- **Testes automatizados** com Vitest (`npm test`): 30 arquivos, 201 testes.
 - Tabelas novas: `UserInvite`, `Incident`, `IncidentEvent` e `SchemaMigration`; colunas novas em `User`: `notificationsSeenAt`, `phone`, `jobTitle`, `avatarKey` e `passwordChangedAt`.
 
 ### Alterado
@@ -95,7 +96,7 @@ Também vale saber:
 - `APP_URL` passa a ser obrigatória para os e-mails de convite e de redefinição de senha.
 - A imagem do MinIO no `env.example` é o fork comunitário `pgsty/minio`, com a versão fixada, porque o repositório oficial `minio/minio` saiu do Docker Hub.
 - Inclua o volume `minio_data` na rotina de backup.
-- Em produção, mantenha `SEED_SUPERADMIN_ON_STARTUP`, `SUPERADMIN_PROMOTE_IF_EXISTS` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS` em `false`. Com o seed ligado, trocar o e-mail do superadmin em Minha Conta faz o próximo restart criar outra conta com o e-mail do `.env`.
+- Em produção, mantenha `SEED_SUPERADMIN_ON_STARTUP`, `SUPERADMIN_PROMOTE_IF_EXISTS` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS` em `false`: o usuário padrão de um banco novo vem do bootstrap, que não depende deles. Com o seed ligado, trocar o e-mail do superadmin em Minha Conta faz o próximo restart criar outra conta com o e-mail do `.env`.
 
 ## 1.1.0
 

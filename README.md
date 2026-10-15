@@ -19,7 +19,7 @@
   <img alt="MySQL" src="https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white" />
   <img alt="MinIO" src="https://img.shields.io/badge/MinIO-S3-C72E49?logo=minio&logoColor=white" />
   <img alt="Docker" src="https://img.shields.io/badge/Docker_Compose-Deploy-2496ED?logo=docker&logoColor=white" />
-  <img alt="Vitest" src="https://img.shields.io/badge/Vitest-197_testes-6E9F18?logo=vitest&logoColor=white" />
+  <img alt="Vitest" src="https://img.shields.io/badge/Vitest-201_testes-6E9F18?logo=vitest&logoColor=white" />
 </p>
 
 ## Sumário
@@ -84,6 +84,7 @@ Resumo; o detalhe está no [CHANGELOG](./CHANGELOG.md).
 **Segurança e infraestrutura**
 
 - Sessão revalidada no banco a cada requisição; trocar ou redefinir a senha encerra as sessões abertas em outros dispositivos.
+- Bootstrap do usuário padrão: num banco sem nenhum SUPERADMIN, o startup cria o superadmin do `.env`; num banco existente, não mexe em nada.
 - Links de e-mail montados só a partir de `APP_URL`; e-mail do superadmin reservado; dependências compatíveis atualizadas.
 - Serviços e containers nomeados serviço + projeto, nenhuma porta padrão e toda a configuração no `.env`.
 - Testes automatizados com Vitest.
@@ -150,7 +151,7 @@ Princípios:
 - Só o `web-statsap` fica na rede do proxy. `mysql-statsap`, `minio-statsap` e `worker-statsap` ficam apenas na rede interna `app_net`, sem porta publicada.
 - O `worker-statsap` não tem cliente GDMS próprio: ele chama a rota interna de sync, que aplica a mesma regra de negócio do botão da interface.
 - `middleware.ts` protege as páginas privadas e bloqueia por papel; as rotas `/api/*` se protegem com `requireRequestAuth(...)` ou `requireRequestAuthOrInternal(...)`.
-- O `web-statsap` aplica o schema e as migrações no startup ([`scripts/docker-entrypoint.sh`](./scripts/docker-entrypoint.sh) → [`scripts/init-db.mjs`](./scripts/init-db.mjs)).
+- O `web-statsap` aplica o schema e as migrações no startup e cria o usuário padrão se o banco não tiver nenhum SUPERADMIN ([`scripts/docker-entrypoint.sh`](./scripts/docker-entrypoint.sh) → [`scripts/init-db.mjs`](./scripts/init-db.mjs) e [`scripts/bootstrap-superadmin.mjs`](./scripts/bootstrap-superadmin.mjs)).
 - Horários são gravados em UTC (`UTC_TIMESTAMP()`, pool com `timezone: "Z"`) e exibidos no fuso `America/Sao_Paulo` ([`lib/dateFormat.ts`](./lib/dateFormat.ts)).
 
 ## Integração GWN/GDMS
@@ -384,6 +385,7 @@ Tela `/account`, disponível para todos os papéis. Abre pelo card "Bem-vindo" d
 
 ### Configuração recomendada em produção
 
+- O usuário padrão é criado pelo bootstrap só quando o banco não tem nenhum SUPERADMIN; ele nunca regrava senha, promove conta ou recria quem já existe.
 - `SEED_SUPERADMIN_ON_STARTUP=false`, `SUPERADMIN_PROMOTE_IF_EXISTS=false` e `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS=false` depois do primeiro bootstrap.
 - `TRUST_PROXY_HEADERS=true` só atrás de proxy que sobrescreva `X-Forwarded-For`/`X-Real-IP`.
 - Se o proxy alcança o `web-statsap` pela rede do proxy, avalie remover a publicação de porta (`ports`): com ela, o app também responde direto no host, sem TLS.
@@ -646,6 +648,7 @@ Omitidos: `.git/`, `.next/` e `node_modules/`.
 |   `-- userStatus.ts / validators.ts / validatorsAuth.ts
 |-- public/{icons.svg, logo_etherium.png}
 |-- scripts
+|   |-- bootstrap-rules.mjs / bootstrap-superadmin.mjs   # usuário padrão no primeiro startup
 |   |-- dev.mjs                           # npm run dev na porta de PORT
 |   |-- docker-entrypoint.sh
 |   |-- gdms-cron.mjs                     # worker
@@ -656,7 +659,7 @@ Omitidos: `.git/`, `.next/` e `node_modules/`.
 |-- styles/globals.css
 `-- tests
     |-- stubs/server-only.ts
-    `-- unit/*.test.ts                    # 29 arquivos
+    `-- unit/*.test.ts                    # 30 arquivos
 ```
 
 </details>
@@ -753,8 +756,8 @@ Toda a configuração vem do `.env`: o `docker-compose.yml` só referencia vari�
 
 | Variável | Exemplo | Uso |
 | --- | --- | --- |
-| `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` / `SUPERADMIN_NAME` | `admin@example.com` / … / `Root` | Conta criada pelo seed; o e-mail fica reservado ao SUPERADMIN |
-| `SEED_SUPERADMIN_ON_STARTUP` | `false` | Roda o seed a cada startup; ligue só no primeiro bootstrap |
+| `SUPERADMIN_EMAIL` / `SUPERADMIN_PASSWORD` / `SUPERADMIN_NAME` | `admin@example.com` / … / `Root` | Usuário padrão: criado automaticamente no startup quando o banco não tem nenhum SUPERADMIN. O e-mail fica reservado ao SUPERADMIN |
+| `SEED_SUPERADMIN_ON_STARTUP` | `false` | Modo de recuperação: roda o seed completo a cada startup, com os dois sinalizadores abaixo. O usuário padrão não depende dele |
 | `SUPERADMIN_PROMOTE_IF_EXISTS` | `false` | Promove a SUPERADMIN uma conta existente com aquele e-mail |
 | `SUPERADMIN_SYNC_PASSWORD_IF_EXISTS` | `false` | Regrava a senha do superadmin com a do `.env` a cada startup (desfaz trocas) |
 
@@ -779,7 +782,7 @@ O banco e o MinIO do Compose ficam só na rede interna, sem porta publicada. Par
 ```bash
 npm install
 node --env-file=.env --env-file=.env.local scripts/init-db.mjs          # schema + migrações
-node --env-file=.env --env-file=.env.local scripts/seed-superadmin.mjs  # superadmin
+node --env-file=.env --env-file=.env.local scripts/bootstrap-superadmin.mjs  # usuário padrão
 npm run dev                                                            # porta de PORT
 ```
 
@@ -807,7 +810,7 @@ Os scripts de banco leem a configuração do ambiente (no Docker, do `env_file`)
 - [ ] Nomes e portas internos coerentes: `MYSQL_HOST` e `DATABASE_URL` em `mysql-statsap:MYSQL_PORT`, `MINIO_ENDPOINT` em `minio-statsap:MINIO_PORT`, `APP_BASE_URL` em `web-statsap:PORT`.
 - [ ] `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD` definidos.
 - [ ] Proxy reverso apontando para `WEB_PROXY_ALIAS:PORT`.
-- [ ] Banco novo: crie o superadmin uma vez com `docker compose exec web-statsap node scripts/seed-superadmin.mjs` (ou ligue `SEED_SUPERADMIN_ON_STARTUP` só no primeiro startup).
+- [ ] `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` e `SUPERADMIN_NAME` preenchidos: em banco novo, o usuário padrão é criado sozinho no primeiro startup.
 - [ ] Sinalizadores do seed, `TRUST_PROXY_HEADERS` e publicação de porta conforme [Configuração recomendada em produção](#configuração-recomendada-em-produção).
 - [ ] SMTP preenchido e destinatários ADMIN/SUPERADMIN com e-mail válido.
 - [ ] Credenciais GDMS preenchidas.
@@ -816,9 +819,10 @@ Os scripts de banco leem a configuração do ambiente (no Docker, do `env_file`)
 ### Startup do `web-statsap`
 
 1. O entrypoint exige `HOST` e `PORT` e roda [`scripts/init-db.mjs`](./scripts/init-db.mjs): schema, colunas novas e migrações únicas (`SchemaMigration`).
-2. Com `SEED_SUPERADMIN_ON_STARTUP=true` e `SUPERADMIN_*` preenchidos, roda [`scripts/seed-superadmin.mjs`](./scripts/seed-superadmin.mjs).
-3. Sobe o Next.js em modo produção em `HOST:PORT`.
-4. O `worker-statsap` espera o `web-statsap` ficar saudável e passa a chamar o sync em modo `status` a cada `SYNC_INTERVAL_MS`.
+2. Roda o bootstrap do usuário padrão ([`scripts/bootstrap-superadmin.mjs`](./scripts/bootstrap-superadmin.mjs)): se o banco não tem nenhum SUPERADMIN, cria o do `.env`; senão, não faz nada. O log mostra `Bootstrap: ...`.
+3. Só com `SEED_SUPERADMIN_ON_STARTUP=true` (modo de recuperação), roda também o seed completo ([`scripts/seed-superadmin.mjs`](./scripts/seed-superadmin.mjs)).
+4. Sobe o Next.js em modo produção em `HOST:PORT`.
+5. O `worker-statsap` espera o `web-statsap` ficar saudável e passa a chamar o sync em modo `status` a cada `SYNC_INTERVAL_MS`.
 
 ### Atualizar para a v1.2
 
@@ -870,7 +874,7 @@ O nome do volume do MinIO tem o nome do projeto do Compose como prefixo (`statsa
 ## Testes e verificação
 
 ```bash
-npm test             # Vitest, uma execução (29 arquivos, 197 testes)
+npm test             # Vitest, uma execução (30 arquivos, 201 testes)
 npm run test:watch   # Vitest em modo observação
 npx tsc --noEmit     # checagem de tipos
 npm run lint         # ESLint
@@ -881,7 +885,7 @@ npm audit --omit=dev # avisos de segurança das dependências
 - Os testes ficam em `tests/unit/` e cobrem:
   - GWN: normalização de coordenadas, planejamento e motor do sync, cliente GDMS (renovação em `401`);
   - ocorrências: máquina de estados e alertas;
-  - usuários: convites e tokens, autenticação (revalidação e corte de sessão), Minha Conta (serviço, validações, tipo de imagem, chave e recorte da foto);
+  - usuários: bootstrap do usuário padrão, convites e tokens, autenticação (revalidação e corte de sessão), Minha Conta (serviço, validações, tipo de imagem, chave e recorte da foto);
   - segurança: URL pública dos e-mails e e-mail reservado do superadmin;
   - infraestrutura: templates de e-mail (escape e corte em 100 itens), configuração do MinIO, cache, mensagens de erro de banco;
   - interface: cliente HTTP e SSE, rotação do mapa, formatação de datas, preferência da sidebar e tema fixo das telas de autenticação.
@@ -981,7 +985,8 @@ A criação direta de usuário (`POST /api/users`) foi substituída pelo convite
 | `npm run lint` | ESLint |
 | `npm test` / `npm run test:watch` | Testes unitários (Vitest) |
 | `npm run db:init` | Schema, colunas novas e migrações únicas (lê `DATABASE_URL` do ambiente) |
-| `npm run db:seed` | Cria ou atualiza o superadmin conforme os sinalizadores `SUPERADMIN_*` |
+| `npm run db:seed` | Seed completo do superadmin conforme os sinalizadores `SUPERADMIN_*` (recuperação) |
+| `node scripts/bootstrap-superadmin.mjs` | Cria o usuário padrão do `.env` se o banco não tiver nenhum SUPERADMIN (já roda em todo startup) |
 | `node scripts/seed-local.mjs` | Desenvolvimento: garante o superadmin de `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD`, regravando a senha |
 | `node scripts/gdms-cron.mjs` | Worker de sync fora do Compose (exige `APP_BASE_URL`) |
 
@@ -1027,6 +1032,14 @@ O `minio-statsap` exige credenciais próprias, para nunca subir com a senha de f
 - `MINIO_ENDPOINT` precisa usar o nome `minio-statsap` e a porta de `MINIO_PORT`.
 - Se a imagem de `MINIO_IMAGE` não baixar, confira a tag: o repositório oficial `minio/minio` não está mais no Docker Hub.
 - A foto aceita PNG, JPEG ou WebP; outros formatos respondem "Formato não aceito".
+
+### Banco novo e ninguém consegue entrar
+
+O usuário padrão é criado no startup a partir de `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD` e `SUPERADMIN_NAME`. Veja a linha `Bootstrap:` no log do `web-statsap` (`docker compose logs web-statsap`):
+
+- **"superadmin inicial criado"**: entre com o e-mail e a senha do `.env`.
+- **"faltam SUPERADMIN_..."**: preencha as três variáveis e reinicie o `web-statsap`.
+- **"já é de outra conta"**: o e-mail do `.env` pertence a um usuário que não é SUPERADMIN; o bootstrap não promove ninguém sozinho. Use outro e-mail ou promova a conta conscientemente com `SUPERADMIN_PROMOTE_IF_EXISTS=true` e `SEED_SUPERADMIN_ON_STARTUP=true` por um restart.
 
 ### O e-mail do superadmin "volta" depois de um restart
 
