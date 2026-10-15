@@ -1004,6 +1004,10 @@ A criação direta de usuário (`POST /api/users`) foi substituída pelo convite
 - "defina HOST no .env" ou "defina PORT no .env" no log: as duas variáveis são obrigatórias.
 - Acompanhe `docker compose logs -f mysql-statsap web-statsap` e, se necessário, rode `docker compose exec web-statsap node scripts/init-db.mjs`.
 
+### `KeyError: 'id'` ao rodar `docker-compose`
+
+O traceback em Python (`compose/cli/log_printer.py`, `compose/project.py`) vem do `docker-compose` v1, descontinuado e incompatível com o Docker Engine atual. Use o Compose v2 (`docker compose`, com espaço) em todos os comandos deste README. Se ele não estiver instalado no servidor (Debian/Ubuntu): `sudo apt-get install docker-compose-plugin`; confira com `docker compose version`.
+
 ### O domínio responde 502 depois de atualizar
 
 O web mudou de porta. Aponte o proxy reverso para `WEB_PROXY_ALIAS` na porta definida em `PORT`.
