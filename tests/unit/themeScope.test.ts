@@ -15,9 +15,10 @@ describe("hasFixedTheme", () => {
 });
 
 describe("displayedTheme", () => {
-  it("telas de autenticação ficam sempre claras, mesmo com o tema escuro escolhido", () => {
-    expect(displayedTheme("dark", "/login")).toBe("light");
-    expect(displayedTheme("light", "/login")).toBe("light");
+  it("telas de autenticação ficam sempre escuras, mesmo com o tema claro escolhido", () => {
+    expect(displayedTheme("light", "/login")).toBe("dark");
+    expect(displayedTheme("dark", "/login")).toBe("dark");
+    expect(displayedTheme("light", "/forgot-password")).toBe("dark");
   });
 
   it("as demais telas usam o tema escolhido", () => {

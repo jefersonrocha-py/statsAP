@@ -27,7 +27,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - **Controle de rotação do mapa** reescrito: o "N" aponta para o norte real, o arraste é relativo e acompanha o dedo ou o mouse, há botões de 45° e "Norte", e o teclado funciona (setas e `Home`). "Cidade" e "Pinos" preservam a rotação.
 - **Sessão revalidada no banco** a cada requisição: usuário excluído, bloqueado ou suspenso perde o acesso na hora (`401 SESSION_REVOKED`, com os cookies apagados). O papel vem do banco, não do token.
 - **Trocar ou redefinir a senha encerra as sessões abertas em outros dispositivos**; a sessão que fez a troca continua ativa. Trocar o e-mail de acesso avisa o endereço anterior.
-- **Telas de login, senha e convite** com visual fixo, sempre claro: o tema escolhido no app não vale para elas.
+- **Telas de login, senha e convite** com visual fixo, sempre escuro: o tema escolhido no app não vale para elas.
 - **Compose:**
   - serviços e containers nomeados serviço + projeto (`mysql-statsap`, `minio-statsap`, `web-statsap` e `worker-statsap`);
   - toda a configuração vem do `.env`, sem valores fixos, padrões ou comentários;

@@ -6,7 +6,7 @@ import { loadSlim } from "tsparticles-slim";
 
 // Opções fixas: as telas de autenticação não seguem o tema do app (lib/themeScope.ts), e as
 // partículas nunca são recriadas.
-const PARTICLE_COLOR = "#065f46"; // emerald-800: contrasta no fundo claro
+const PARTICLE_COLOR = "#08FFB8"; // verde neon sobre o fundo escuro
 
 const OPTIONS: ISourceOptions = {
   fullScreen: false,
@@ -14,18 +14,18 @@ const OPTIONS: ISourceOptions = {
   detectRetina: true,
   fpsLimit: 60,
   particles: {
-    number: { value: 50, density: { enable: true, area: 900 } },
+    number: { value: 45, density: { enable: true, area: 900 } },
     color: { value: PARTICLE_COLOR },
-    opacity: { value: 0.28 },
-    size: { value: { min: 1.2, max: 2.6 } },
+    opacity: { value: 0.18 },
+    size: { value: { min: 1, max: 2 } },
     links: {
       enable: true,
       color: PARTICLE_COLOR,
-      opacity: 0.2,
-      distance: 150,
-      width: 1.1,
+      opacity: 0.1,
+      distance: 140,
+      width: 1,
     },
-    move: { enable: true, speed: 0.32, outModes: { default: "out" } },
+    move: { enable: true, speed: 0.35, outModes: { default: "out" } },
   },
   interactivity: {
     events: { resize: true },

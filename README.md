@@ -78,7 +78,7 @@ Resumo; o detalhe está no [CHANGELOG](./CHANGELOG.md).
 - Minha Conta: dados pessoais, troca de e-mail e de senha e foto de perfil guardada no MinIO.
 - Controle de rotação do mapa reescrito (bússola alinhada ao norte, arraste relativo, botões e teclado).
 - Sidebar retrátil com a preferência salva, gaveta própria no celular, identidade visual com símbolo e nome, e versão exibida na interface.
-- Telas de login, senha e convite com visual fixo, sem herdar o tema escolhido no app.
+- Telas de login, senha e convite com visual fixo, sempre escuro, sem herdar o tema escolhido no app.
 - Revisão de acentuação e pontuação em toda a interface.
 
 **Segurança e infraestrutura**
@@ -448,7 +448,7 @@ Tela `/account`, disponível para todos os papéis. Abre pelo card "Bem-vindo" d
 ### Tema
 
 - O botão da barra superior alterna entre claro e escuro. A preferência fica em [`store/theme.ts`](./store/theme.ts), é aplicada antes da pintura por [`components/ThemeScript.tsx`](./components/ThemeScript.tsx) e reaplicada a cada troca de tela por [`components/ThemeSync.tsx`](./components/ThemeSync.tsx).
-- As telas de login, de senha e de convite têm visual fixo, sempre claro: o tema escolhido no app não vale para elas, nem ao sair do app pelo botão "Sair" ([`lib/themeScope.ts`](./lib/themeScope.ts)). As partículas do fundo também não mudam.
+- As telas de login, de senha e de convite têm visual fixo, sempre escuro, com as partículas neon: o tema escolhido no app não vale para elas, nem ao sair do app pelo botão "Sair" ([`lib/themeScope.ts`](./lib/themeScope.ts)). As partículas do fundo também não mudam.
 
 ### Rotação do mapa
 
@@ -888,7 +888,7 @@ npm audit --omit=dev # avisos de segurança das dependências
   - usuários: bootstrap do usuário padrão, convites e tokens, autenticação (revalidação e corte de sessão), Minha Conta (serviço, validações, tipo de imagem, chave e recorte da foto);
   - segurança: URL pública dos e-mails e e-mail reservado do superadmin;
   - infraestrutura: templates de e-mail (escape e corte em 100 itens), configuração do MinIO, cache, mensagens de erro de banco;
-  - interface: cliente HTTP e SSE, rotação do mapa, formatação de datas, preferência da sidebar e tema fixo das telas de autenticação.
+  - interface: cliente HTTP e SSE, rotação do mapa, formatação de datas, preferência da sidebar e tema fixo (escuro) das telas de autenticação.
 - [`vitest.config.ts`](./vitest.config.ts) usa os mesmos aliases do `tsconfig` (`@lib`, `@services`, …) e troca `server-only` por um módulo vazio.
 - `npm run test:e2e` (Playwright) ainda não tem suíte versionada.
 

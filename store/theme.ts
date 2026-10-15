@@ -22,7 +22,7 @@ export function resolveTheme(theme: ThemeMode): ResolvedTheme {
   return theme === "system" ? getSystemTheme() : theme;
 }
 
-// A preferência vale para o app; as telas de autenticação ficam sempre claras (lib/themeScope.ts).
+// A preferência vale para o app; as telas de autenticação ficam sempre escuras (lib/themeScope.ts).
 function applyTheme(theme: ThemeMode) {
   const resolvedTheme = resolveTheme(theme);
 
