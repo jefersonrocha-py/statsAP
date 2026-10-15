@@ -64,7 +64,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative isolate flex min-h-[100dvh] items-center justify-center px-4 py-8">
+    <div className="relative isolate flex min-h-[100dvh] items-center justify-center overflow-hidden px-4 py-8">
       <div className="absolute inset-0 -z-10">
         <AuthParticles />
       </div>
