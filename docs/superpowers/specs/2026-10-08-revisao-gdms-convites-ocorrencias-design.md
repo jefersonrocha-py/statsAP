@@ -1,8 +1,10 @@
 # Revisão v1.2 — Coordenadas GDMS, /clients, convites, ocorrências, rotação do mapa e PT-BR
 
+> **Registro histórico.** Este documento descreve o planejamento feito em 2026-10-08. A v1.2 foi além dele (Minha Conta com MinIO, nomes de serviço + projeto, portas não padrão, revisão de segurança) e foi integrada à `main` em 2026-10-15. A referência atual é o [README](../../../README.md); o que mudou está no [CHANGELOG](../../../CHANGELOG.md).
+
 - **Data:** 2026-10-08
-- **Status:** aprovado para especificação (aguardando revisão desta spec)
-- **Branch:** `feat/gdms-coords-convites-ocorrencias`
+- **Status:** implementado e integrado à `main` (v1.2.0)
+- **Branch:** desenvolvido em `feat/gdms-coords-convites-ocorrencias`, já integrado à `main` e removido
 
 ## 1. Contexto e objetivo
 

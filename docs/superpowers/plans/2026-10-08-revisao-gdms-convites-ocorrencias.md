@@ -1,5 +1,7 @@
 # Revisão v1.2 (coordenadas GDMS, /clients, convites, ocorrências, mapa, PT-BR) — Plano de implementação
 
+> **Registro histórico.** Este documento descreve o planejamento feito em 2026-10-08. A v1.2 foi além dele (Minha Conta com MinIO, nomes de serviço + projeto, portas não padrão, revisão de segurança) e foi integrada à `main` em 2026-10-15. A referência atual é o [README](../../../README.md); o que mudou está no [CHANGELOG](../../../CHANGELOG.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Automatizar a posição dos APs a partir do GWN, corrigir /clients e falhas de segurança, e entregar convite por e-mail, ocorrências de AP offline com auditoria, controle de rotação do mapa e revisão PT-BR.
